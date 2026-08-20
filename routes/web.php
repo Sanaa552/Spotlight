@@ -7,6 +7,10 @@ use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\DeclarationController;
 use App\Http\Controllers\ModerateurController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PublicDeclarationController;
+
+Route::get('/declarations-publiques', [PublicDeclarationController::class, 'index'])->name('public.declarations.index');
+Route::view('/a-propos', 'public.about')->name('public.about');
 
 Route::get('/', function () {
     return view('welcome');

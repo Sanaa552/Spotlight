@@ -1,3 +1,51 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@keyframes spotlight-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+}
+
+@keyframes spotlight-float-hero {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-16px) scale(1.02); }
+}
+
+@keyframes spotlight-radar-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@keyframes spotlight-pin-bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+}
+
+@keyframes spotlight-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+}
+
+@keyframes spotlight-radar-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@keyframes spotlight-pin-bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+}
+
+.animate-spotlight-float {
+    animation: spotlight-float 3s ease-in-out infinite;
+}
+
+.animate-spotlight-radar-spin {
+    animation: spotlight-radar-spin 6s linear infinite;
+    transform-origin: 95px 95px;
+}
+
+.animate-spotlight-pin-bounce {
+    animation: spotlight-pin-bounce 1.6s ease-in-out infinite;
+}
