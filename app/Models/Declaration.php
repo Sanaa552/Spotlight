@@ -57,7 +57,11 @@ class Declaration extends Model
     {
         return $this->hasMany(PieceJointe::class);
     }
-
+    
+        public function commentaires(): HasMany
+    {
+        return $this->hasMany(Commentaire::class)->latest();
+    }
     // ----- Opérations UML: soumettre(), publier(), cloturer() -----
 
     public function soumettre(): static

@@ -8,6 +8,7 @@ use App\Http\Controllers\DeclarationController;
 use App\Http\Controllers\ModerateurController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PublicDeclarationController;
+use App\Http\Controllers\FeedController;
 
 Route::get('/declarations-publiques', [PublicDeclarationController::class, 'index'])->name('public.declarations.index');
 Route::view('/a-propos', 'public.about')->name('public.about');
@@ -16,9 +17,12 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+
+Route::get('/dashboard', [FeedController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
+
+Route::post('/declarations/{declaration}/commenter', [FeedController::class, 'commenter'])
+    ->middleware(['auth', 'verified'])
+    ->name('declarations.commenter');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

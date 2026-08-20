@@ -27,6 +27,7 @@ class ProfileUpdateRequest extends FormRequest
                 Rule::unique(User::class)->ignore($this->user()->id),
             ],
              'telephone' => ['required', 'string', 'max:20'],
+             'photo' => ['nullable', 'image', 'max:4096'],
         ];
     }
 }
