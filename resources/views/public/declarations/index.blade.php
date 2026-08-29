@@ -30,15 +30,15 @@
         <div class="flex justify-center gap-2 mb-10">
             <a href="{{ route('public.declarations.index', ['onglet' => 'pertes']) }}"
                class="px-5 py-2 rounded-full text-sm font-semibold transition {{ $onglet === 'pertes' ? 'bg-alerte text-white' : 'bg-white/5 text-argent/60 hover:bg-white/10' }}">
-                🔍 Pertes
+                Pertes
             </a>
             <a href="{{ route('public.declarations.index', ['onglet' => 'decouvertes']) }}"
                class="px-5 py-2 rounded-full text-sm font-semibold transition {{ $onglet === 'decouvertes' ? 'bg-sonar text-white' : 'bg-white/5 text-argent/60 hover:bg-white/10' }}">
-                📢 Découvertes
+                Découvertes
             </a>
             <a href="{{ route('public.declarations.index', ['onglet' => 'restitutions']) }}"
                class="px-5 py-2 rounded-full text-sm font-semibold transition {{ $onglet === 'restitutions' ? 'bg-laiton text-white' : 'bg-white/5 text-argent/60 hover:bg-white/10' }}">
-                ✅ Restitutions
+                Restitutions
             </a>
         </div>
 
@@ -64,7 +64,7 @@
                             <div class="flex items-center gap-2 mb-2">
                                 <x-status-badge :statut="$declaration->statut" />
                                 @if ($declaration->localisation)
-                                    <span class="text-xs text-argent/40">📍 {{ $declaration->localisation->adresse }}</span>
+                                    <span class="text-xs text-argent/40"> {{ $declaration->localisation->adresse }}</span>
                                 @endif
                             </div>
                             <h3 class="text-argent font-semibold text-sm mb-1">

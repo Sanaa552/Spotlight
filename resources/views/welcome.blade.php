@@ -26,7 +26,8 @@
     <div class="h-[73px]"></div>
 
     <!-- Hero -->
-    <section class="px-6 py-16 sm:py-24 flex flex-col items-center text-center">
+        <!-- Hero -->
+    <section class="px-6 pt-6 pb-16 sm:pt-8 sm:pb-24 flex flex-col items-center text-center">
         <img src="{{ asset('images/spotlight-logo-complet.png') }}"
              alt="Spotlight — Repérer, alerter, retrouver. Personnes disparues, objets disparus, alertes en temps réel."
              class="w-full max-w-2xl object-contain animate-spotlight-float">

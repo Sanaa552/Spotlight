@@ -71,6 +71,13 @@ class DeclarationController extends Controller
             ]);
         }
 
+            if ($declaration->type === 'decouverte') {
+            return redirect()
+                ->route('declarations.show', $declaration)
+                ->with('success', 'Déclaration soumise avec succès.')
+                ->with('proposer_carte', true);
+        }
+
         return redirect()
             ->route('declarations.index')
             ->with('success', 'Déclaration soumise avec succès.');

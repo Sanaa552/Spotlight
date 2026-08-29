@@ -29,12 +29,12 @@
                             <label class="flex items-center gap-2 border rounded-lg p-4 cursor-pointer transition"
                                    :class="type === 'perte' ? 'border-alerte ring-1 ring-alerte bg-alerte/5' : 'border-gray-300'">
                                 <input type="radio" name="type" value="perte" x-model="type" class="text-alerte focus:ring-alerte">
-                                <span>🔍 Déclarer une perte</span>
+                                <span>Déclarer une perte</span>
                             </label>
                             <label class="flex items-center gap-2 border rounded-lg p-4 cursor-pointer transition"
                                    :class="type === 'decouverte' ? 'border-sonar ring-1 ring-sonar bg-sonar/5' : 'border-gray-300'">
                                 <input type="radio" name="type" value="decouverte" x-model="type" class="text-sonar focus:ring-sonar">
-                                <span>📢 Déclarer une découverte</span>
+                                <span> Déclarer une découverte</span>
                             </label>
                         </div>
                     </div>

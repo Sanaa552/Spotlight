@@ -11,11 +11,49 @@ use Illuminate\View\View;
 
 class StatistiqueController extends Controller
 {
-    public function index(): View
+        public function index(): View
     {
         $statistiques = Statistique::latest('date_generation')->paginate(20);
 
-        return view('admin.statistiques.index', compact('statistiques'));
+        // ----- Données pour les graphiques -----
+        $mois = collect(range(5, 0))->map(fn ($i) => now()->subMonths($i)->startOfMonth());
+
+        $evolutionPertes = $mois->map(function ($date) {
+            return Declaration::where('type', 'perte')
+                ->whereYear('created_at', $date->year)
+                ->whereMonth('created_at', $date->month)
+                ->count();
+        });
+
+        $evolutionDecouvertes = $mois->map(function ($date) {
+            return Declaration::where('type', 'decouverte')
+                ->whereYear('created_at', $date->year)
+                ->whereMonth('created_at', $date->month)
+                ->count();
+        });
+
+        $evolutionRestitutions = $mois->map(function ($date) {
+            return Declaration::where('statut', 'cloturee')
+                ->whereYear('cloturee_at', $date->year)
+                ->whereMonth('cloturee_at', $date->month)
+                ->count();
+        });
+
+        $repartitionStatuts = [
+            'en_attente' => Declaration::where('statut', 'en_attente')->count(),
+            'validee' => Declaration::where('statut', 'validee')->count(),
+            'rejetee' => Declaration::where('statut', 'rejetee')->count(),
+            'cloturee' => Declaration::where('statut', 'cloturee')->count(),
+        ];
+
+        return view('admin.statistiques.index', [
+            'statistiques' => $statistiques,
+            'chartLabels' => $mois->map(fn ($d) => $d->translatedFormat('M Y'))->toArray(),
+            'chartPertes' => $evolutionPertes->toArray(),
+            'chartDecouvertes' => $evolutionDecouvertes->toArray(),
+            'chartRestitutions' => $evolutionRestitutions->toArray(),
+            'repartitionStatuts' => $repartitionStatuts,
+        ]);
     }
 
     /** Générer statistiques (calcul local, éventuellement enrichi par API statistique externe) */

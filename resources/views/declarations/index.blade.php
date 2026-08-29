@@ -43,7 +43,7 @@
                                     <p class="text-sm text-gray-600 mt-1 line-clamp-2">{{ $declaration->description }}</p>
                                     @if ($declaration->localisation)
                                         <p class="text-xs text-gray-400 mt-2">
-                                            📍 {{ $declaration->localisation->adresse }}
+                                             {{ $declaration->localisation->adresse }}
                                         </p>
                                     @endif
                                 </div>

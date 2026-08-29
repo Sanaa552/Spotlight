@@ -13,9 +13,21 @@
     <div class="py-12">
         <div class="max-w-3xl mx-auto sm:px-6 lg:px-8 space-y-6">
 
-            @if (session('success'))
+                       @if (session('success'))
                 <div class="bg-sonar/10 border border-sonar/30 text-sonar-dark px-4 py-3 rounded-lg">
                     {{ session('success') }}
+                </div>
+            @endif
+
+            @if (session('proposer_carte') && $declaration->localisation)
+                <div class="bg-azur/10 border border-azur/30 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <p class="text-sm text-azur">
+                        Ta déclaration est enregistrée. Trouve le commissariat le plus proche pour y déposer l'objet ou signaler la personne.
+                    </p>
+                    <a href="{{ route('declarations.commissariats', $declaration) }}"
+                       class="shrink-0 inline-flex items-center justify-center px-5 py-2 bg-azur text-white text-xs font-semibold uppercase tracking-widest rounded-md hover:bg-azur-dark transition">
+                        Accéder à la carte
+                    </a>
                 </div>
             @endif
 
@@ -39,7 +51,7 @@
                 <p class="mt-4 text-gray-700 whitespace-pre-line">{{ $declaration->description }}</p>
 
                 @if ($declaration->lieu)
-                    <p class="mt-4 text-sm text-gray-500">🗺️ {{ $declaration->lieu }}</p>
+                    <p class="mt-4 text-sm text-gray-500">{{ $declaration->lieu }}</p>
                 @endif
 
                 @if ($declaration->statut === 'rejetee' && $declaration->motif_rejet)
@@ -52,12 +64,19 @@
             {{-- Localisation --}}
             @if ($declaration->localisation)
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
-                    <h4 class="font-semibold text-gray-900 mb-2">📍 Localisation</h4>
+                    <h4 class="font-semibold text-gray-900 mb-2">Localisation</h4>
                     <p class="text-sm text-gray-700">{{ $declaration->localisation->adresse }}</p>
                     @if ($declaration->localisation->latitude && $declaration->localisation->longitude)
                         <p class="text-xs text-gray-400 mt-1">
                             {{ $declaration->localisation->latitude }}, {{ $declaration->localisation->longitude }}
                         </p>
+                    @endif
+
+                    @if ($declaration->type === 'decouverte')
+                        <a href="{{ route('declarations.commissariats', $declaration) }}"
+                           class="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-azur text-white text-xs font-semibold uppercase tracking-widest rounded-md hover:bg-azur-dark transition">
+                            Voir les commissariats proches
+                        </a>
                     @endif
                 </div>
             @endif
@@ -89,12 +108,12 @@
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
                 <h4 class="font-semibold text-gray-900 mb-3">Suivi</h4>
                 <ul class="text-sm text-gray-600 space-y-2">
-                    <li>📝 Déclaration soumise le {{ $declaration->created_at->format('d/m/Y à H:i') }}</li>
+                    <li>Déclaration soumise le {{ $declaration->created_at->format('d/m/Y à H:i') }}</li>
                     @if ($declaration->moderateur)
                         <li>👤 Traitée par {{ $declaration->moderateur->name }}</li>
                     @endif
                     @if ($declaration->statut === 'cloturee' && $declaration->cloturee_at)
-                        <li>✅ Clôturée le {{ $declaration->cloturee_at->format('d/m/Y à H:i') }}</li>
+                        <li>Clôturée le {{ $declaration->cloturee_at->format('d/m/Y à H:i') }}</li>
                     @endif
                 </ul>
             </div>
@@ -106,7 +125,7 @@
                     <button type="submit"
                             onclick="return confirm('Confirmer que l\'objet/personne a bien été restitué(e) ?')"
                             class="w-full inline-flex justify-center items-center px-4 py-3 bg-sonar border border-transparent rounded-md font-semibold text-sm text-white uppercase tracking-widest hover:bg-sonar-dark focus:outline-none focus:ring-2 focus:ring-sonar focus:ring-offset-2 transition">
-                        ✅ Confirmer la restitution
+                        Confirmer la restitution
                     </button>
                 </form>
             @endif

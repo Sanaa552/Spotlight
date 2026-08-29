@@ -32,19 +32,29 @@
                                 </svg>
                             </a>
                             <a href="{{ route('notifications.index') }}" title="Notifications"
-                               class="p-2.5 rounded-full transition {{ request()->routeIs('notifications.index') ? 'text-alerte bg-alerte/10' : 'text-argent/60 hover:text-argent hover:bg-white/5' }}">
+                               class="relative p-2.5 rounded-full transition {{ request()->routeIs('notifications.index') ? 'text-alerte bg-alerte/10' : 'text-argent/60 hover:text-argent hover:bg-white/5' }}">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2c0 .5-.2 1-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
                                 </svg>
+                                @if ($notificationsNonLues > 0)
+                                    <span class="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-alerte text-white text-[10px] font-bold flex items-center justify-center">
+                                        {{ $notificationsNonLues > 9 ? '9+' : $notificationsNonLues }}
+                                    </span>
+                                @endif
                             </a>
                         @endif
 
                         @if (auth()->user()->isModerateur())
                             <a href="{{ route('moderation.index') }}" title="Modération"
-                               class="p-2.5 rounded-full transition {{ request()->routeIs('moderation.*') ? 'text-alerte bg-alerte/10' : 'text-argent/60 hover:text-argent hover:bg-white/5' }}">
+                               class="relative p-2.5 rounded-full transition {{ request()->routeIs('moderation.*') ? 'text-alerte bg-alerte/10' : 'text-argent/60 hover:text-argent hover:bg-white/5' }}">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
                                 </svg>
+                                @if ($declarationsEnAttente > 0)
+                                    <span class="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-alerte text-white text-[10px] font-bold flex items-center justify-center">
+                                        {{ $declarationsEnAttente > 9 ? '9+' : $declarationsEnAttente }}
+                                    </span>
+                                @endif
                             </a>
                         @endif
 
@@ -69,10 +79,17 @@
             <!-- Settings Dropdown -->
             <div class="hidden sm:flex sm:items-center sm:ms-6">
                 <x-dropdown align="right" width="48">
-                    <x-slot name="trigger">
-                        <button class="flex items-center text-sm font-medium text-argent/70 hover:text-argent focus:outline-none transition">
+                                        <x-slot name="trigger">
+                        <button class="flex items-center gap-2 text-sm font-medium text-argent/70 hover:text-argent focus:outline-none transition">
+                            @if (Auth::user()->photo_path)
+                                <img src="{{ Auth::user()->photoUrl() }}" alt="{{ Auth::user()->name }}" class="w-8 h-8 rounded-full object-cover">
+                            @else
+                                <span class="w-8 h-8 rounded-full bg-azur/15 text-azur text-xs font-bold flex items-center justify-center">
+                                    {{ Auth::user()->initiales() }}
+                                </span>
+                            @endif
                             <div>{{ Auth::user()->name }}</div>
-
+                            
                             @auth
                                 <span @class([
                                     'ms-2 px-2 py-0.5 rounded-full text-xs font-semibold',
@@ -202,19 +219,29 @@
                         </svg>
                     </a>
                     <a href="{{ route('notifications.index') }}" title="Notifications"
-                       class="p-2.5 rounded-full transition {{ request()->routeIs('notifications.index') ? 'text-alerte bg-alerte/10' : 'text-argent/60' }}">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2c0 .5-.2 1-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-                        </svg>
+                               class="relative p-2.5 rounded-full transition {{ request()->routeIs('notifications.index') ? 'text-alerte bg-alerte/10' : 'text-argent/60 hover:text-argent hover:bg-white/5' }}">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2c0 .5-.2 1-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                                </svg>
+                                @if ($notificationsNonLues > 0)
+                                    <span class="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-alerte text-white text-[10px] font-bold flex items-center justify-center">
+                                        {{ $notificationsNonLues > 9 ? '9+' : $notificationsNonLues }}
+                                    </span>
+                                @endif
                     </a>
                 @endif
 
                 @if (auth()->user()->isModerateur())
                     <a href="{{ route('moderation.index') }}" title="Modération"
-                       class="p-2.5 rounded-full transition {{ request()->routeIs('moderation.*') ? 'text-alerte bg-alerte/10' : 'text-argent/60' }}">
+                       class="relative p-2.5 rounded-full transition {{ request()->routeIs('moderation.*') ? 'text-alerte bg-alerte/10' : 'text-argent/60' }}">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
                         </svg>
+                        @if ($declarationsEnAttente > 0)
+                            <span class="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-alerte text-white text-[10px] font-bold flex items-center justify-center">
+                                {{ $declarationsEnAttente > 9 ? '9+' : $declarationsEnAttente }}
+                            </span>
+                        @endif
                     </a>
                 @endif
 

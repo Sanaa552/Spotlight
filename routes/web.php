@@ -44,6 +44,8 @@ Route::middleware(['auth', 'role:citoyen'])->group(function () {
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('/notifications/{appNotification}/lue', [NotificationController::class, 'marquerLue'])
         ->name('notifications.marquer-lue');
+    Route::get('/declarations/{declaration}/commissariats', [\App\Http\Controllers\CommissariatController::class, 'proches'])
+        ->name('declarations.commissariats');
 });
 
 // ---------- Modérateur ----------

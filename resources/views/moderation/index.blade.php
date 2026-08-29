@@ -16,7 +16,7 @@
 
             @if ($declarations->isEmpty())
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-8 text-center text-gray-500">
-                    Aucune déclaration en attente. 🎉
+                    Aucune déclaration en attente. 
                 </div>
             @else
                 @foreach ($declarations as $declaration)
@@ -33,11 +33,11 @@
                                 <p class="text-sm text-gray-600 mt-1">{{ $declaration->description }}</p>
 
                                 <div class="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-                                    <span>👤 {{ $declaration->citoyen->name }}</span>
+                                    <span> {{ $declaration->citoyen->name }}</span>
                                     @if ($declaration->localisation)
-                                        <span>📍 {{ $declaration->localisation->adresse }}</span>
+                                        <span> {{ $declaration->localisation->adresse }}</span>
                                     @endif
-                                    <span>🕒 {{ $declaration->created_at->diffForHumans() }}</span>
+                                    <span> {{ $declaration->created_at->diffForHumans() }}</span>
                                 </div>
                             </div>
                         </div>
@@ -47,14 +47,14 @@
                                 @csrf
                                 <button type="submit"
                                         class="inline-flex items-center px-4 py-2 bg-sonar border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-sonar-dark transition">
-                                    ✅ Valider
+                                     Valider
                                 </button>
                             </form>
 
                             <button type="button"
                                     onclick="document.getElementById('rejet-modal-{{ $declaration->id }}').classList.remove('hidden')"
                                     class="inline-flex items-center px-4 py-2 bg-alerte border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-alerte-dark transition">
-                                ❌ Rejeter
+                                 Rejeter
                             </button>
 
                             <a href="{{ route('declarations.show', $declaration) }}"

@@ -13,10 +13,26 @@
         @csrf
     </form>
 
-    <form method="post" action="{{ route('profile.update') }}" class="mt-6 space-y-6">
+        <form method="post" action="{{ route('profile.update') }}" enctype="multipart/form-data" class="mt-6 space-y-6">
         @csrf
         @method('patch')
+         <!-- photo -->
+                  <div class="flex items-center gap-4">
+            @if ($user->photo_path)
+                <img src="{{ $user->photoUrl() }}" alt="{{ $user->name }}" class="w-16 h-16 rounded-full object-cover">
+            @else
+                <span class="w-16 h-16 rounded-full bg-azur/15 text-azur font-bold flex items-center justify-center">
+                    {{ $user->initiales() }}
+                </span>
+            @endif
 
+            <div class="flex-1">
+                <x-input-label for="photo" value="Photo de profil" />
+                <input id="photo" name="photo" type="file" accept=".jpg,.jpeg,.png"
+                       class="mt-1 block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-azur/10 file:text-azur hover:file:bg-azur/20" />
+                <x-input-error class="mt-2" :messages="$errors->get('photo')" />
+            </div>
+        </div>
         <div>
             <x-input-label for="name" :value="__('Name')" />
             <x-text-input id="name" name="name" type="text" class="mt-1 block w-full" :value="old('name', $user->name)" required autofocus autocomplete="name" />
