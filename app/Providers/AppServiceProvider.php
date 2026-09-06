@@ -19,6 +19,7 @@ class AppServiceProvider extends ServiceProvider
      */
         public function boot(): void
     {
+        \Illuminate\Database\Schema\Builder::defaultStringLength(191);
         \Illuminate\Support\Facades\View::composer('layouts.navigation', function ($view) {
             $notificationsNonLues = 0;
             $declarationsEnAttente = 0;

@@ -185,22 +185,22 @@
 
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <a href="tel:117" class="block bg-white/5 hover:bg-white/10 rounded-lg p-4 text-center transition">
-                    <div class="text-2xl mb-1">👮</div>
+                    <div class="text-2xl mb-1"> </div>
                     <div class="text-xs text-argent/50 uppercase tracking-wide">Police</div>
                     <div class="text-argent font-bold text-lg">117</div>
                 </a>
                 <a href="tel:113" class="block bg-white/5 hover:bg-white/10 rounded-lg p-4 text-center transition">
-                    <div class="text-2xl mb-1">🪖</div>
+                    <div class="text-2xl mb-1"> </div>
                     <div class="text-xs text-argent/50 uppercase tracking-wide">Gendarmerie</div>
                     <div class="text-argent font-bold text-lg">113</div>
                 </a>
                 <a href="tel:118" class="block bg-white/5 hover:bg-white/10 rounded-lg p-4 text-center transition">
-                    <div class="text-2xl mb-1">🚒</div>
+                    <div class="text-2xl mb-1"> </div>
                     <div class="text-xs text-argent/50 uppercase tracking-wide">Pompiers</div>
                     <div class="text-argent font-bold text-lg">118</div>
                 </a>
                 <a href="tel:119" class="block bg-white/5 hover:bg-white/10 rounded-lg p-4 text-center transition">
-                    <div class="text-2xl mb-1">🚑</div>
+                    <div class="text-2xl mb-1"> </div>
                     <div class="text-xs text-argent/50 uppercase tracking-wide">SAMU</div>
                     <div class="text-argent font-bold text-lg">119</div>
                 </a>
@@ -217,7 +217,7 @@
     <!-- Zone d'action -->
     <section class="px-6 pb-20">
         <div class="max-w-4xl mx-auto text-center">
-            <h2 class="text-argent font-semibold text-xl mb-2">📍 Présent partout au Cameroun</h2>
+            <h2 class="text-argent font-semibold text-xl mb-2"> Présent partout au Cameroun</h2>
             <p class="text-sm text-argent/60 max-w-xl mx-auto">
                 Spotlight est ouvert à toutes les villes et régions du Cameroun — de Yaoundé et Douala
                 aux zones rurales les plus reculées. Toute déclaration est visible par l'ensemble

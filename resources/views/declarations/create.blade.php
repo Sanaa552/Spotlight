@@ -79,7 +79,7 @@
 
                     {{-- Localisation --}}
                     <fieldset class="border border-gray-200 rounded-lg p-4">
-                        <legend class="text-sm font-medium text-gray-700 px-2">📍 Localisation</legend>
+                        <legend class="text-sm font-medium text-gray-700 px-2"> Localisation</legend>
 
                         <div class="space-y-4">
                             <div>
@@ -88,18 +88,6 @@
                                               class="mt-1 block w-full" :value="old('adresse')" />
                             </div>
 
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <x-input-label for="latitude" value="Latitude (optionnel)" />
-                                    <x-text-input id="latitude" name="latitude" type="number" step="any"
-                                                  class="mt-1 block w-full" :value="old('latitude')" />
-                                </div>
-                                <div>
-                                    <x-input-label for="longitude" value="Longitude (optionnel)" />
-                                    <x-text-input id="longitude" name="longitude" type="number" step="any"
-                                                  class="mt-1 block w-full" :value="old('longitude')" />
-                                </div>
-                            </div>
                         </div>
                     </fieldset>
 
