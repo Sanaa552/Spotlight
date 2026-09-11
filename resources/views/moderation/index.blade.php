@@ -57,7 +57,7 @@
                                  Rejeter
                             </button>
 
-                            <a href="{{ route('declarations.show', $declaration) }}"
+                            <a href="{{ route('moderation.declarations.show', $declaration) }}"
                                class="inline-flex items-center px-4 py-2 text-xs font-semibold text-gray-500 hover:text-gray-800 uppercase tracking-widest">
                                 Voir le détail
                             </a>

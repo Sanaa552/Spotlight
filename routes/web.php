@@ -51,6 +51,8 @@ Route::middleware(['auth', 'role:citoyen'])->group(function () {
 // ---------- Modérateur ----------
 Route::middleware(['auth', 'role:moderateur'])->prefix('moderation')->name('moderation.')->group(function () {
     Route::get('/', [ModerateurController::class, 'index'])->name('index');
+    Route::get('/declarations/{declaration}', [DeclarationController::class, 'show'])
+    ->name('declarations.show');
     Route::post('/{declaration}/valider', [ModerateurController::class, 'valider'])->name('valider');
     Route::post('/{declaration}/rejeter', [ModerateurController::class, 'rejeter'])->name('rejeter');
     Route::post('/utilisateurs/{user}/bloquer', [ModerateurController::class, 'bloquerUtilisateur'])->name('bloquer');
@@ -64,4 +66,7 @@ Route::middleware(['auth', 'role:administrateur'])->prefix('admin')->name('admin
 
     Route::get('/statistiques', [StatistiqueController::class, 'index'])->name('statistiques.index');
     Route::post('/statistiques', [StatistiqueController::class, 'generer'])->name('statistiques.generer');
+
+    Route::get('/declarations/{declaration}', [DeclarationController::class, 'show'])
+    ->name('declarations.show');
 });

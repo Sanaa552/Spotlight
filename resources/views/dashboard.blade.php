@@ -9,23 +9,22 @@
         <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
 
             @if (session('success'))
-                <div class="bg-sonar/10 border border-sonar/30 text-sonar-dark px-4 py-3 rounded-lg mb-6">
+                <div class="bg-sonar/10 border border-sonar/30 text-sonar-dark px-4 py-3 rounded-xl mb-6">
                     {{ session('success') }}
                 </div>
             @endif
 
-            {{-- Fil des déclarations --}}
             @if ($declarations->isEmpty())
-                <div class="bg-white shadow-sm rounded-lg p-10 text-center text-gray-500">
+                <div class="bg-white shadow-sm border border-gray-100 rounded-xl p-10 text-center text-gray-500 flex flex-col items-center gap-2">
+                    <x-icon name="megaphone" class="w-8 h-8 text-gray-300" />
                     Aucune déclaration publiée pour le moment.
                 </div>
             @else
                 <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
                     @foreach ($declarations as $declaration)
                         <article id="declaration-{{ $declaration->id }}" x-data="{ showComments: false }"
-                                 class="bg-white shadow-sm rounded-lg overflow-hidden">
+                                 class="bg-white shadow-sm border border-gray-100 rounded-xl overflow-hidden">
 
-                            {{-- En-tête : auteur --}}
                             <div class="flex items-center gap-3 px-4 pt-4">
                                 @if ($declaration->citoyen->photo_path)
                                     <img src="{{ $declaration->citoyen->photoUrl() }}" alt="{{ $declaration->citoyen->name }}"
@@ -43,18 +42,19 @@
                                 <x-status-badge :statut="$declaration->statut" />
                             </div>
 
-                            {{-- Corps --}}
                             <div class="px-4 pt-3">
                                 <h3 class="font-semibold text-gray-900">
                                     {{ $declaration->type_perte ?? $declaration->type_decouverte ?? ucfirst($declaration->categorie) }}
                                 </h3>
                                 <p class="text-sm text-gray-700 mt-1 whitespace-pre-line">{{ $declaration->description }}</p>
                                 @if ($declaration->localisation)
-                                    <p class="text-xs text-gray-400 mt-2">📍 {{ $declaration->localisation->adresse }}</p>
+                                    <p class="text-xs text-gray-400 mt-2 flex items-center gap-1.5">
+                                        <x-icon name="location" class="w-3.5 h-3.5" />
+                                        {{ $declaration->localisation->adresse }}
+                                    </p>
                                 @endif
                             </div>
 
-                            {{-- Photo --}}
                             @if ($declaration->piecesJointes->isNotEmpty())
                                 <a href="{{ route('declarations.show', $declaration) }}" class="block mt-3">
                                     <img src="{{ $declaration->piecesJointes->first()->url() }}"
@@ -63,13 +63,10 @@
                                 </a>
                             @endif
 
-                            {{-- Barre d'actions --}}
                             <div class="px-4 py-3 flex items-center justify-between border-t border-gray-100 mt-2">
                                 <button @click="showComments = ! showComments"
-                                        class="flex items-center gap-2 text-sm font-medium text-alerte hover:text-alerte-dark transition">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z"/>
-                                    </svg>
+                                        class="flex items-center gap-1.5 text-sm font-medium text-alerte hover:text-alerte-dark transition">
+                                    <x-icon name="megaphone" class="w-4 h-4" />
                                     J'ai une info
                                     @if ($declaration->commentaires->count() > 0)
                                         <span class="text-xs text-gray-400">({{ $declaration->commentaires->count() }})</span>
@@ -81,12 +78,11 @@
                                 </a>
                             </div>
 
-                            {{-- Commentaires --}}
                             <div x-show="showComments" x-cloak x-transition class="border-t border-gray-100 bg-gray-50 px-4 py-4 space-y-4">
 
                                 @forelse ($declaration->commentaires as $commentaire)
                                     <div class="flex items-start gap-2">
-                                                                                @if ($commentaire->auteur->photo_path)
+                                        @if ($commentaire->auteur->photo_path)
                                             <img src="{{ $commentaire->auteur->photoUrl() }}" alt="{{ $commentaire->auteur->name }}"
                                                  class="w-7 h-7 rounded-full object-cover shrink-0">
                                         @else
@@ -104,7 +100,6 @@
                                     <p class="text-xs text-gray-400 text-center">Aucune info partagée. Sois le premier à réagir !</p>
                                 @endforelse
 
-                                {{-- Nouvelle info --}}
                                 <form method="POST" action="{{ route('declarations.commenter', $declaration) }}" class="flex items-center gap-2 pt-2">
                                     @csrf
                                     <input type="text" name="contenu" required maxlength="1000"

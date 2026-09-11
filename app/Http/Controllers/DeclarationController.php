@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\Role;
 use App\Models\Declaration;
 use App\Models\Localisation;
 use App\Models\PieceJointe;
@@ -60,7 +61,7 @@ class DeclarationController extends Controller
 
         // Relation 1-N avec PieceJointe (plusieurs fichiers possibles)
         foreach ($request->file('pieces_jointes', []) as $fichier) {
-            $chemin = $fichier->store('declarations', 'public');
+            $chemin = $fichier->store('declarations',  'public');
 
             PieceJointe::create([
                 'declaration_id' => $declaration->id,
@@ -104,7 +105,15 @@ class DeclarationController extends Controller
 
     private function authorizeOwner(Declaration $declaration): void
     {
-        if ($declaration->user_id !== request()->user()->id) {
+        $user = request()->user();
+
+        // Administrateur et modérateur peuvent voir toutes les déclarations
+        if (in_array($user->role, [Role::Administrateur, Role::Moderateur], true)) {
+    return;
+}
+
+        // Le citoyen peut uniquement voir ses propres déclarations
+        if ($declaration->user_id !== $user->id) {
             abort(403);
         }
     }
