@@ -3,19 +3,25 @@
 namespace App\Models;
 
 use App\Enums\Role;
+use App\Notifications\SpotlightResetPassword;
+use App\Notifications\SpotlightVerifyEmail;
+use Illuminate\Contracts\Auth\MustVerifyEmail as MustVerifyEmailContract;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmailContract
 {
-    use Notifiable;
+    use HasFactory, Notifiable;
 
     protected $fillable = [
         'name',
         'email',
         'telephone',
         'photo_path',
+        'facebook_id',
+        'facebook_avatar_url',
         'password',
         'role',
         'is_blocked',
@@ -43,11 +49,13 @@ class User extends Authenticatable
         return $this->role === Role::Citoyen;
     }
 
-        public function photoUrl(): string
+    public function photoUrl(): ?string
     {
-        return $this->photo_path
-            ? asset('storage/'.$this->photo_path)
-            : null;
+        if ($this->photo_path) {
+            return asset('storage/'.$this->photo_path);
+        }
+
+        return $this->facebook_avatar_url;
     }
 
     public function initiales(): string
@@ -66,6 +74,16 @@ class User extends Authenticatable
     public function isAdministrateur(): bool
     {
         return $this->role === Role::Administrateur;
+    }
+
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new SpotlightResetPassword($token));
+    }
+
+    public function sendEmailVerificationNotification(): void
+    {
+        $this->notify(new SpotlightVerifyEmail);
     }
 
     // ----- Relations -----

@@ -12,14 +12,40 @@
                 @if ($errors->any())
                     <div class="mb-6 bg-alerte/10 border border-alerte/30 text-alerte-dark px-4 py-3 rounded-lg">
                         <ul class="list-disc list-inside text-sm space-y-1">
-                            @foreach ($errors->all() as $error)
+                            @foreach (array_unique($errors->all()) as $error)
                                 <li>{{ $error }}</li>
                             @endforeach
                         </ul>
                     </div>
                 @endif
 
-                <form method="POST" action="{{ route('declarations.store') }}" enctype="multipart/form-data" x-data="{ type: 'perte' }" class="space-y-6">
+                <form method="POST" action="{{ route('declarations.store') }}" enctype="multipart/form-data"
+                      x-data="{
+                          type: '{{ old('type', 'perte') }}',
+                          fileError: '',
+                          validateFiles(event) {
+                              const attachments = Array.from(this.$refs.attachments.files);
+                              const lossReport = this.type === 'perte'
+                                  ? Array.from(this.$refs.lossReport.files)
+                                  : [];
+                              const files = [...attachments, ...lossReport];
+                              const oversized = files.find(file => file.size > 10 * 1024 * 1024);
+                              const total = files.reduce((size, file) => size + file.size, 0);
+
+                              this.fileError = attachments.length > 5
+                                  ? 'Vous pouvez sélectionner au maximum 5 fichiers.'
+                                  : oversized
+                                      ? `Le fichier « ${oversized.name} » dépasse la limite de 10 Mo.`
+                                      : total > 60 * 1024 * 1024
+                                          ? 'L’ensemble des fichiers ne doit pas dépasser 60 Mo.'
+                                          : '';
+
+                              if (this.fileError) {
+                                  event.target.value = '';
+                              }
+                          }
+                      }"
+                      class="space-y-6">
                     @csrf
 
                     {{-- Type de déclaration --}}
@@ -41,7 +67,7 @@
 
                     {{-- Catégorie --}}
                     <div>
-                        <x-input-label for="categorie" value="Catégorie" />
+                        <x-input-label for="categorie" value="Personne ou objet concerné" />
                         <select id="categorie" name="categorie" required
                                 class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-alerte focus:ring-alerte">
                             <option value="">-- Sélectionner --</option>
@@ -55,6 +81,20 @@
                         <x-input-label for="type_perte" value="Précision (ex: personne disparue, objet perdu...)" />
                         <x-text-input id="type_perte" name="type_perte" type="text" class="mt-1 block w-full"
                                       :value="old('type_perte')" />
+                    </div>
+
+                    <div x-show="type === 'perte'" x-cloak>
+                        <x-input-label for="declaration_perte" value="Déclaration de perte officielle" />
+                        <input id="declaration_perte" name="declaration_perte" type="file"
+                               accept=".jpg,.jpeg,.png,.pdf"
+                               x-ref="lossReport"
+                               x-bind:disabled="type !== 'perte'"
+                               x-bind:required="type === 'perte'"
+                               x-on:change="validateFiles($event)"
+                               class="mt-1 block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-alerte/10 file:text-alerte-dark hover:file:bg-alerte/20" />
+                        <p class="mt-1 text-xs text-gray-500">
+                            Photo ou PDF du document officiel, pour une personne ou un objet perdu. 10 Mo maximum. Ce document reste privé.
+                        </p>
                     </div>
 
                     {{-- Type découverte (si découverte) --}}
@@ -93,11 +133,14 @@
 
                     {{-- Pièces jointes (multiple) --}}
                     <div>
-                        <x-input-label for="pieces_jointes" value="Pièces jointes (photos, PDF — 5 max, 4 Mo chacune)" />
+                        <x-input-label for="pieces_jointes" value="Photos et documents complémentaires (5 max, 10 Mo chacun)" />
                         <input id="pieces_jointes" name="pieces_jointes[]" type="file" multiple
                                accept=".jpg,.jpeg,.png,.pdf"
+                               x-ref="attachments"
+                               x-on:change="validateFiles($event)"
                                class="mt-1 block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-azur/10 file:text-azur hover:file:bg-azur/20" />
-                        <p class="mt-1 text-xs text-gray-400">Formats acceptés : JPG, PNG, PDF.</p>
+                        <p class="mt-1 text-xs text-gray-500">Formats acceptés : JPG, JPEG, PNG et PDF. Taille totale maximale : 60 Mo.</p>
+                        <p x-show="fileError" x-text="fileError" class="mt-2 text-sm font-medium text-alerte" style="display:none"></p>
                     </div>
 
                     <div class="flex justify-end gap-3 pt-4 border-t">

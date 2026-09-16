@@ -6,6 +6,7 @@ use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -45,8 +46,28 @@ class LoginRequest extends FormRequest
         if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 
+            Log::warning('Connexion refusee Spotlight', [
+                'email' => $this->string('email')->lower()->value(),
+                'ip' => $this->ip(),
+            ]);
+
             throw ValidationException::withMessages([
                 'email' => trans('auth.failed'),
+            ]);
+        }
+
+        if (Auth::user()?->is_blocked) {
+            $blockedUserId = Auth::id();
+            Auth::logout();
+            RateLimiter::hit($this->throttleKey());
+
+            Log::notice('Connexion compte bloque refusee Spotlight', [
+                'user_id' => $blockedUserId,
+                'ip' => $this->ip(),
+            ]);
+
+            throw ValidationException::withMessages([
+                'email' => 'Votre compte a été bloqué.',
             ]);
         }
 

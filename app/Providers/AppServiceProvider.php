@@ -2,6 +2,9 @@
 
 namespace App\Providers;
 
+use App\Models\Declaration;
+use Illuminate\Database\Schema\Builder;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -17,10 +20,10 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Bootstrap any application services.
      */
-        public function boot(): void
+    public function boot(): void
     {
-        \Illuminate\Database\Schema\Builder::defaultStringLength(191);
-        \Illuminate\Support\Facades\View::composer('layouts.navigation', function ($view) {
+        Builder::defaultStringLength(191);
+        View::composer('layouts.navigation', function ($view) {
             $notificationsNonLues = 0;
             $declarationsEnAttente = 0;
 
@@ -29,8 +32,8 @@ class AppServiceProvider extends ServiceProvider
                     $notificationsNonLues = auth()->user()->appNotifications()->where('lu', false)->count();
                 }
 
-                if (auth()->user()->isModerateur()) {
-                    $declarationsEnAttente = \App\Models\Declaration::where('statut', 'en_attente')->count();
+                if (auth()->user()->isModerateur() || auth()->user()->isAdministrateur()) {
+                    $declarationsEnAttente = Declaration::where('statut', 'en_attente')->count();
                 }
             }
 

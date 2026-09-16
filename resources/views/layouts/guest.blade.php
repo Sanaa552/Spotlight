@@ -19,17 +19,25 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="font-sans text-gray-900 antialiased">
-    <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-nuit">
-        <div>
-            <a href="/" class="flex items-center gap-2">
-                <img src="{{ asset('images/spotlight-icon.png') }}" alt="Spotlight" class="h-16 w-16 object-contain">
-                <x-spotlight-wordmark size="text-3xl" />
-            </a>
-        </div>
+    <div class="min-h-screen bg-white sm:bg-nuit">
+        <header class="border-b border-white/10 bg-nuit px-4 py-2.5 sm:absolute sm:inset-x-0 sm:top-0 sm:z-10 sm:px-8 sm:py-4">
+            <div class="mx-auto flex max-w-7xl items-center justify-between">
+                <a href="/" class="flex items-center gap-2" aria-label="Retour à l'accueil">
+                    <img src="{{ asset('images/spotlight-icon.png') }}" alt="" class="h-10 w-10 object-contain sm:h-12 sm:w-12">
+                    <x-spotlight-wordmark size="text-xl sm:text-2xl" />
+                </a>
 
-        <div class="w-full sm:max-w-md mt-6 px-6 py-4 bg-white shadow-md overflow-hidden sm:rounded-lg">
-            {{ $slot }}
-        </div>
+                <a href="/" class="text-sm font-medium text-white/80 transition hover:text-white">
+                    Accueil
+                </a>
+            </div>
+        </header>
+
+        <main class="flex min-h-[calc(100vh-61px)] items-start justify-center px-5 py-6 sm:min-h-screen sm:items-center sm:px-6 sm:py-24">
+            <div class="w-full max-w-md bg-white sm:rounded-lg sm:px-6 sm:py-5 sm:shadow-xl">
+                {{ $slot }}
+            </div>
+        </main>
     </div>
 </body>
 </html>

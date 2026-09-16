@@ -6,6 +6,7 @@ use App\Models\Commentaire;
 use App\Models\Declaration;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
 class FeedController extends Controller
@@ -14,7 +15,7 @@ class FeedController extends Controller
     public function index(): View
     {
         $declarations = Declaration::whereIn('statut', ['validee', 'cloturee'])
-            ->with(['citoyen', 'localisation', 'piecesJointes', 'commentaires.auteur'])
+            ->with(['citoyen', 'localisation', 'piecesPubliques', 'commentaires.auteur'])
             ->latest()
             ->paginate(8);
 
@@ -32,6 +33,11 @@ class FeedController extends Controller
             'declaration_id' => $declaration->id,
             'user_id' => $request->user()->id,
             'contenu' => $validated['contenu'],
+        ]);
+
+        Log::info('Commentaire publie Spotlight', [
+            'declaration_id' => $declaration->id,
+            'user_id' => $request->user()->id,
         ]);
 
         return back()->with('success', 'Commentaire publié.')->withFragment('declaration-'.$declaration->id);

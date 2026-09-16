@@ -44,7 +44,7 @@
                             </a>
                         @endif
 
-                        @if (auth()->user()->isModerateur())
+                        @if (auth()->user()->isModerateur() || auth()->user()->isAdministrateur())
                             <a href="{{ route('moderation.index') }}" title="Modération"
                                class="relative p-2.5 rounded-full transition {{ request()->routeIs('moderation.*') ? 'text-alerte bg-alerte/10' : 'text-argent/60 hover:text-argent hover:bg-white/5' }}">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -97,7 +97,7 @@
                                     'bg-laiton/15 text-laiton' => auth()->user()->isModerateur(),
                                     'bg-alerte/15 text-alerte' => auth()->user()->isAdministrateur(),
                                 ])>
-                                    {{ auth()->user()->role->value }}
+                                    {{ auth()->user()->role?->value ?? 'citoyen' }}
                                 </span>
                             @endauth
 
@@ -155,7 +155,7 @@
                     </x-responsive-nav-link>
                 @endif
 
-                @if (auth()->user()->isModerateur())
+                @if (auth()->user()->isModerateur() || auth()->user()->isAdministrateur())
                     <x-responsive-nav-link :href="route('moderation.index')" :active="request()->routeIs('moderation.*')">
                         {{ __('Modération') }}
                     </x-responsive-nav-link>
@@ -194,79 +194,80 @@
         </div>
     </div>
 
-        <!-- Barre d'icônes mobile (fixe en bas) -->
-    <div class="sm:hidden fixed bottom-0 inset-x-0 z-40 bg-nuit border-t border-white/10">
-        <div class="flex items-center justify-around py-2">
-            <a href="{{ route('dashboard') }}" title="Accueil"
-               class="p-2.5 rounded-full transition {{ request()->routeIs('dashboard') ? 'text-alerte bg-alerte/10' : 'text-argent/60' }}">
-                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 3l9 8h-3v9h-5v-6H11v6H6v-9H3l9-8z"/>
-                </svg>
-            </a>
+    @auth
+        <div class="sm:hidden fixed bottom-0 inset-x-0 z-40 border-t border-white/10 bg-nuit/95 shadow-[0_-10px_30px_rgba(0,0,0,0.25)] backdrop-blur">
+            <div class="mx-auto grid max-w-md grid-cols-5 items-end gap-1 px-2 pb-[calc(env(safe-area-inset-bottom)+0.45rem)] pt-2">
+                <a href="{{ route('dashboard') }}"
+                   class="flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-lg px-1 text-[11px] font-medium transition {{ request()->routeIs('dashboard') ? 'text-white bg-alerte/15' : 'text-argent/60' }}">
+                    <x-icon name="home" class="h-5 w-5" />
+                    <span>Accueil</span>
+                </a>
 
-            @auth
                 @if (auth()->user()->isCitoyen())
-                    <a href="{{ route('declarations.create') }}" title="Nouvelle déclaration"
-                       class="p-2.5 rounded-full transition {{ request()->routeIs('declarations.create') ? 'text-alerte bg-alerte/10' : 'text-argent/60' }}">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
-                        </svg>
+                    <a href="{{ route('declarations.index') }}"
+                       class="flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-lg px-1 text-[11px] font-medium transition {{ request()->routeIs('declarations.index') || request()->routeIs('declarations.show') ? 'text-white bg-alerte/15' : 'text-argent/60' }}">
+                        <x-icon name="list" class="h-5 w-5" />
+                        <span>Suivi</span>
                     </a>
-                    <a href="{{ route('declarations.index') }}" title="Mes déclarations"
-                       class="p-2.5 rounded-full transition {{ request()->routeIs('declarations.index') || request()->routeIs('declarations.show') ? 'text-alerte bg-alerte/10' : 'text-argent/60' }}">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                        </svg>
-                    </a>
-                    <a href="{{ route('notifications.index') }}" title="Notifications"
-                               class="relative p-2.5 rounded-full transition {{ request()->routeIs('notifications.index') ? 'text-alerte bg-alerte/10' : 'text-argent/60 hover:text-argent hover:bg-white/5' }}">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2c0 .5-.2 1-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-                                </svg>
-                                @if ($notificationsNonLues > 0)
-                                    <span class="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-alerte text-white text-[10px] font-bold flex items-center justify-center">
-                                        {{ $notificationsNonLues > 9 ? '9+' : $notificationsNonLues }}
-                                    </span>
-                                @endif
-                    </a>
-                @endif
 
-                @if (auth()->user()->isModerateur())
-                    <a href="{{ route('moderation.index') }}" title="Modération"
-                       class="relative p-2.5 rounded-full transition {{ request()->routeIs('moderation.*') ? 'text-alerte bg-alerte/10' : 'text-argent/60' }}">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-                        </svg>
+                    <a href="{{ route('declarations.create') }}"
+                       class="-mt-5 flex min-h-[64px] flex-col items-center justify-center gap-1 rounded-xl bg-alerte px-1 text-[11px] font-semibold text-white shadow-lg shadow-alerte/30 transition {{ request()->routeIs('declarations.create') ? 'ring-2 ring-white/70' : '' }}">
+                        <x-icon name="plus" class="h-6 w-6" />
+                        <span>Déclarer</span>
+                    </a>
+
+                    <a href="{{ route('notifications.index') }}"
+                       class="relative flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-lg px-1 text-[11px] font-medium transition {{ request()->routeIs('notifications.*') ? 'text-white bg-alerte/15' : 'text-argent/60' }}">
+                        <x-icon name="bell" class="h-5 w-5" />
+                        <span>Alertes</span>
+                        @if ($notificationsNonLues > 0)
+                            <span class="absolute right-4 top-1 min-w-[16px] rounded-full bg-alerte px-1 text-center text-[10px] font-bold leading-4 text-white">
+                                {{ $notificationsNonLues > 9 ? '9+' : $notificationsNonLues }}
+                            </span>
+                        @endif
+                    </a>
+                @elseif (auth()->user()->isModerateur())
+                    <a href="{{ route('moderation.index') }}"
+                       class="relative col-span-3 flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-lg px-1 text-[11px] font-medium transition {{ request()->routeIs('moderation.*') ? 'text-white bg-alerte/15' : 'text-argent/60' }}">
+                        <x-icon name="shield-check" class="h-5 w-5" />
+                        <span>Modération</span>
                         @if ($declarationsEnAttente > 0)
-                            <span class="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-alerte text-white text-[10px] font-bold flex items-center justify-center">
+                            <span class="absolute right-1/3 top-1 min-w-[16px] rounded-full bg-alerte px-1 text-center text-[10px] font-bold leading-4 text-white">
                                 {{ $declarationsEnAttente > 9 ? '9+' : $declarationsEnAttente }}
                             </span>
                         @endif
                     </a>
+                @else
+                    <a href="{{ route('moderation.index') }}"
+                       class="relative flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-lg px-1 text-[11px] font-medium transition {{ request()->routeIs('moderation.*') ? 'text-white bg-alerte/15' : 'text-argent/60' }}">
+                        <x-icon name="shield-check" class="h-5 w-5" />
+                        <span>Modérer</span>
+                        @if ($declarationsEnAttente > 0)
+                            <span class="absolute right-4 top-1 min-w-[16px] rounded-full bg-alerte px-1 text-center text-[10px] font-bold leading-4 text-white">
+                                {{ $declarationsEnAttente > 9 ? '9+' : $declarationsEnAttente }}
+                            </span>
+                        @endif
+                    </a>
+
+                    <a href="{{ route('admin.users.index') }}"
+                       class="flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-lg px-1 text-[11px] font-medium transition {{ request()->routeIs('admin.users.*') ? 'text-white bg-alerte/15' : 'text-argent/60' }}">
+                        <x-icon name="users" class="h-5 w-5" />
+                        <span>Comptes</span>
+                    </a>
+
+                    <a href="{{ route('admin.statistiques.index') }}"
+                       class="flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-lg px-1 text-[11px] font-medium transition {{ request()->routeIs('admin.statistiques.*') ? 'text-white bg-alerte/15' : 'text-argent/60' }}">
+                        <x-icon name="chart" class="h-5 w-5" />
+                        <span>Stats</span>
+                    </a>
                 @endif
 
-                @if (auth()->user()->isAdministrateur())
-                    <a href="{{ route('admin.users.index') }}" title="Utilisateurs"
-                       class="p-2.5 rounded-full transition {{ request()->routeIs('admin.users.*') ? 'text-alerte bg-alerte/10' : 'text-argent/60' }}">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 100-8 4 4 0 000 8zm6 3.13a4 4 0 00-3-3.87"/>
-                        </svg>
-                    </a>
-                    <a href="{{ route('admin.statistiques.index') }}" title="Statistiques"
-                       class="p-2.5 rounded-full transition {{ request()->routeIs('admin.statistiques.*') ? 'text-alerte bg-alerte/10' : 'text-argent/60' }}">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-                        </svg>
-                    </a>
-                @endif
-            @endauth
-
-            <a href="{{ route('profile.edit') }}" title="Profil"
-               class="p-2.5 rounded-full transition {{ request()->routeIs('profile.edit') ? 'text-alerte bg-alerte/10' : 'text-argent/60' }}">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                </svg>
-            </a>
+                <a href="{{ route('profile.edit') }}"
+                   class="flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-lg px-1 text-[11px] font-medium transition {{ request()->routeIs('profile.edit') ? 'text-white bg-alerte/15' : 'text-argent/60' }}">
+                    <x-icon name="user" class="h-5 w-5" />
+                    <span>Profil</span>
+                </a>
+            </div>
         </div>
-    </div>
+    @endauth
 </nav>

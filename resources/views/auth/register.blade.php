@@ -1,5 +1,20 @@
 <x-guest-layout>
-    <form method="POST" action="{{ route('register') }}" class="flex flex-col gap-4">
+    <div class="mb-4 text-center">
+        <h1 class="text-xl font-semibold text-gray-900">Créer un compte</h1>
+        <p class="mt-1 text-sm text-gray-500">Déclarez une perte ou une découverte en quelques minutes.</p>
+    </div>
+
+    <div class="mx-auto mb-3 max-w-xs">
+        <x-facebook-button href="{{ route('facebook.redirect') }}" label="S'inscrire avec Facebook" />
+
+        <div class="mt-3 flex items-center gap-3 text-xs uppercase tracking-widest text-gray-400">
+            <span class="h-px flex-1 bg-gray-200"></span>
+            <span>ou</span>
+            <span class="h-px flex-1 bg-gray-200"></span>
+        </div>
+    </div>
+
+    <form method="POST" action="{{ route('register') }}" class="flex flex-col gap-3.5">
         @csrf
 
         <!-- Name -->
@@ -18,7 +33,7 @@
                 <!-- Téléphone -->
         <div class="w-full">
             <x-input-label for="telephone" :value="__('Téléphone')" />
-            <x-text-input id="telephone" class="block mt-1 w-full" type="tel" name="telephone" :value="old('telephone')" required autocomplete="tel" placeholder="+237 6XX XX XX XX" />
+            <x-text-input id="telephone" class="block mt-1 w-full" type="tel" name="telephone" :value="old('telephone')" autocomplete="tel" placeholder="+237 6XX XX XX XX" />
             <x-input-error :messages="$errors->get('telephone')" class="mt-2" />
         </div>
 

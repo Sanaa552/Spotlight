@@ -49,14 +49,15 @@
         @else
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 @foreach ($declarations as $declaration)
+                    @php($cover = $declaration->piecesPubliques->first(fn ($piece) => $piece->estImage()))
                     <div class="bg-white/5 border border-white/10 rounded-lg overflow-hidden">
-                        @if ($declaration->piecesJointes->isNotEmpty())
-                            <img src="{{ $declaration->piecesJointes->first()->url() }}"
+                        @if ($cover)
+                            <img src="{{ $cover->url() }}"
                                  alt="{{ $declaration->categorie }}"
                                  class="w-full h-48 object-cover">
                         @else
-                            <div class="w-full h-48 bg-white/5 flex items-center justify-center text-4xl">
-                                📋
+                            <div class="w-full h-48 bg-white/5 flex items-center justify-center">
+                                <x-icon name="search" class="h-10 w-10 text-argent/30" />
                             </div>
                         @endif
 

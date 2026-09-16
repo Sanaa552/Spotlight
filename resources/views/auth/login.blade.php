@@ -1,8 +1,23 @@
 <x-guest-layout>
+    <div class="mb-4 text-center">
+        <h1 class="text-xl font-semibold text-gray-900">Connexion</h1>
+        <p class="mt-1 text-sm text-gray-500">Accédez à votre espace Spotlight.</p>
+    </div>
+
     <!-- Session Status -->
     <x-auth-session-status class="mb-4" :status="session('status')" />
 
-    <form method="POST" action="{{ route('login') }}" class="flex flex-col gap-4">
+    <div class="mx-auto mb-3 max-w-xs">
+        <x-facebook-button href="{{ route('facebook.redirect') }}" label="Continuer avec Facebook" />
+
+        <div class="mt-3 flex items-center gap-3 text-xs uppercase tracking-widest text-gray-400">
+            <span class="h-px flex-1 bg-gray-200"></span>
+            <span>ou</span>
+            <span class="h-px flex-1 bg-gray-200"></span>
+        </div>
+    </div>
+
+    <form method="POST" action="{{ route('login') }}" class="flex flex-col gap-3.5">
         @csrf
         
         <!-- Email Address -->

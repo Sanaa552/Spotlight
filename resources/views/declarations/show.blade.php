@@ -1,11 +1,17 @@
 <x-app-layout>
+    @php
+        $backRoute = auth()->user()->isCitoyen()
+            ? route('declarations.index')
+            : route('moderation.index');
+    @endphp
+
     <x-slot name="header">
         <div class="flex items-center justify-between">
             <h2 class="font-semibold text-xl text-argent leading-tight">
                 {{ __('Déclaration') }} #{{ $declaration->id }}
             </h2>
-            <a href="{{ route('declarations.index') }}" class="text-sm text-alerte hover:underline">
-                ← Retour à mes déclarations
+            <a href="{{ $backRoute }}" class="text-sm text-alerte hover:underline">
+                Retour
             </a>
         </div>
     </x-slot>
@@ -90,15 +96,36 @@
                 </div>
             @endif
 
+            @php
+                $piecesPubliques = $declaration->piecesJointes->where('type_document', 'piece_jointe');
+                $declarationPerte = $declaration->piecesJointes->firstWhere('type_document', 'declaration_perte');
+            @endphp
+
+            @if ($declarationPerte)
+                <div class="bg-white shadow-sm border border-gray-100 overflow-hidden rounded-xl p-6">
+                    <h4 class="font-semibold text-gray-900 flex items-center gap-2">
+                        <x-icon name="shield-check" class="w-5 h-5 text-sonar" />
+                        Déclaration de perte officielle
+                    </h4>
+                    <p class="mt-1 text-xs text-gray-500">Document privé, accessible uniquement au citoyen concerné et à l’équipe de modération.</p>
+                    <a href="{{ $declarationPerte->url() }}"
+                       class="mt-4 flex min-w-0 items-center gap-3 border-t border-gray-100 pt-4 text-sm font-medium text-azur hover:text-azur-dark">
+                        <x-icon name="paperclip" class="h-5 w-5 shrink-0" />
+                        <span class="truncate">{{ $declarationPerte->nom_original }}</span>
+                        <span class="ml-auto shrink-0 text-xs text-gray-400">{{ number_format(($declarationPerte->taille ?? 0) / 1024 / 1024, 1, ',', ' ') }} Mo</span>
+                    </a>
+                </div>
+            @endif
+
             {{-- Pièces jointes --}}
-            @if ($declaration->piecesJointes->isNotEmpty())
+            @if ($piecesPubliques->isNotEmpty())
                 <div class="bg-white shadow-sm border border-gray-100 overflow-hidden rounded-xl p-6">
                     <h4 class="font-semibold text-gray-900 mb-3 flex items-center gap-2">
                         <x-icon name="paperclip" class="w-4 h-4 text-azur" />
                         Pièces jointes
                     </h4>
                     <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        @foreach ($declaration->piecesJointes as $piece)
+                        @foreach ($piecesPubliques as $piece)
                             <a href="{{ $piece->url() }}" target="_blank"
                                class="block border border-gray-100 rounded-lg overflow-hidden hover:opacity-80 transition">
                                 @if ($piece->estImage())
@@ -140,16 +167,30 @@
             </div>
 
             {{-- Action : confirmer restitution --}}
-            @if ($declaration->statut === 'validee')
-                <form method="POST" action="{{ route('declarations.confirmer-restitution', $declaration) }}">
-                    @csrf
-                    <button type="submit"
-                            onclick="return confirm('Confirmer que l\'objet/personne a bien été restitué(e) ?')"
-                            class="w-full inline-flex justify-center items-center gap-2 px-4 py-3 bg-sonar border border-transparent rounded-lg font-semibold text-sm text-white uppercase tracking-widest hover:bg-sonar-dark focus:outline-none focus:ring-2 focus:ring-sonar focus:ring-offset-2 transition">
-                        <x-icon name="check-circle" class="w-5 h-5" />
-                        Confirmer la restitution
-                    </button>
-                </form>
+            @if (auth()->user()->isCitoyen() && $declaration->user_id === auth()->id() && $declaration->statut === 'validee')
+                <button type="button"
+                        x-data=""
+                        x-on:click="$dispatch('open-modal', 'confirm-restitution')"
+                        class="w-full inline-flex justify-center items-center gap-2 px-4 py-3 bg-sonar border border-transparent rounded-lg font-semibold text-sm text-white uppercase tracking-widest hover:bg-sonar-dark focus:outline-none focus:ring-2 focus:ring-sonar focus:ring-offset-2 transition">
+                    <x-icon name="check-circle" class="w-5 h-5" />
+                    Confirmer la restitution
+                </button>
+
+                <x-modal name="confirm-restitution" maxWidth="md" focusable>
+                    <form method="POST" action="{{ route('declarations.confirmer-restitution', $declaration) }}" class="p-6">
+                        @csrf
+                        <h2 class="text-lg font-semibold text-gray-900">Confirmer la restitution ?</h2>
+                        <p class="mt-2 text-sm leading-6 text-gray-600">
+                            Confirmez uniquement si la personne ou l’objet concerné a réellement été retrouvé et restitué. La déclaration sera alors clôturée.
+                        </p>
+                        <div class="mt-6 flex justify-end gap-3">
+                            <x-secondary-button x-on:click="$dispatch('close')">Annuler</x-secondary-button>
+                            <button type="submit" class="inline-flex items-center rounded-md bg-sonar px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white hover:bg-sonar-dark focus:outline-none focus:ring-2 focus:ring-sonar focus:ring-offset-2">
+                                Confirmer la restitution
+                            </button>
+                        </div>
+                    </form>
+                </x-modal>
             @endif
 
         </div>

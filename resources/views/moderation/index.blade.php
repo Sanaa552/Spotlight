@@ -14,6 +14,12 @@
                 </div>
             @endif
 
+            @if (session('warning'))
+                <div class="bg-laiton/10 border border-laiton/30 text-laiton px-4 py-3 rounded-lg">
+                    {{ session('warning') }}
+                </div>
+            @endif
+
             @if ($declarations->isEmpty())
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-8 text-center text-gray-500">
                     Aucune déclaration en attente. 
@@ -43,18 +49,20 @@
                         </div>
 
                         <div class="mt-4 pt-4 border-t flex flex-wrap gap-3">
-                            <form method="POST" action="{{ route('moderation.valider', $declaration) }}">
-                                @csrf
-                                <button type="submit"
-                                        class="inline-flex items-center px-4 py-2 bg-sonar border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-sonar-dark transition">
-                                     Valider
-                                </button>
-                            </form>
+                            <button type="button"
+                                    x-data=""
+                                    x-on:click="$dispatch('open-modal', 'validate-declaration-{{ $declaration->id }}')"
+                                    class="inline-flex items-center gap-2 px-4 py-2 bg-sonar border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-sonar-dark transition">
+                                <x-icon name="check-circle" class="h-4 w-4" />
+                                Valider
+                            </button>
 
                             <button type="button"
-                                    onclick="document.getElementById('rejet-modal-{{ $declaration->id }}').classList.remove('hidden')"
-                                    class="inline-flex items-center px-4 py-2 bg-alerte border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-alerte-dark transition">
-                                 Rejeter
+                                    x-data=""
+                                    x-on:click="$dispatch('open-modal', 'reject-declaration-{{ $declaration->id }}')"
+                                    class="inline-flex items-center gap-2 px-4 py-2 bg-alerte border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-alerte-dark transition">
+                                <x-icon name="x-circle" class="h-4 w-4" />
+                                Rejeter
                             </button>
 
                             <a href="{{ route('moderation.declarations.show', $declaration) }}"
@@ -63,27 +71,43 @@
                             </a>
                         </div>
 
-                        {{-- Modal de rejet (simple, sans JS framework) --}}
-                        <div id="rejet-modal-{{ $declaration->id }}" class="hidden mt-4 bg-alerte/5 border border-alerte/20 rounded-lg p-4">
-                            <form method="POST" action="{{ route('moderation.rejeter', $declaration) }}">
+                        <x-modal name="validate-declaration-{{ $declaration->id }}" maxWidth="md" focusable>
+                            <form method="POST" action="{{ route('moderation.valider', $declaration) }}" class="p-6">
                                 @csrf
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Motif du rejet</label>
-                                <textarea name="motif_rejet" rows="2" required
-                                          class="block w-full border-gray-300 rounded-md shadow-sm focus:border-alerte focus:ring-alerte"
-                                          placeholder="Expliquez pourquoi cette déclaration est rejetée..."></textarea>
-                                <div class="mt-3 flex gap-2">
-                                    <button type="submit"
-                                            class="px-4 py-2 bg-alerte text-white text-xs font-semibold uppercase rounded-md hover:bg-alerte-dark">
-                                        Confirmer le rejet
-                                    </button>
-                                    <button type="button"
-                                            onclick="document.getElementById('rejet-modal-{{ $declaration->id }}').classList.add('hidden')"
-                                            class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">
-                                        Annuler
+                                <h2 class="text-lg font-semibold text-gray-900">Valider cette déclaration ?</h2>
+                                <p class="mt-2 text-sm leading-6 text-gray-600">
+                                    La déclaration <strong>#{{ $declaration->id }}</strong> sera rendue publique et Spotlight tentera de la publier sur les réseaux sociaux.
+                                </p>
+                                <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                                    <x-secondary-button x-on:click="$dispatch('close')">Annuler</x-secondary-button>
+                                    <button type="submit" class="inline-flex justify-center rounded-md bg-sonar px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white hover:bg-sonar-dark">
+                                        Valider et publier
                                     </button>
                                 </div>
                             </form>
-                        </div>
+                        </x-modal>
+
+                        <x-modal name="reject-declaration-{{ $declaration->id }}" maxWidth="md" focusable>
+                            <form method="POST" action="{{ route('moderation.rejeter', $declaration) }}" class="p-6">
+                                @csrf
+                                <h2 class="text-lg font-semibold text-gray-900">Rejeter cette déclaration ?</h2>
+                                <p class="mt-2 text-sm leading-6 text-gray-600">
+                                    Le citoyen recevra le motif du rejet de la déclaration <strong>#{{ $declaration->id }}</strong>.
+                                </p>
+                                <label for="motif-rejet-{{ $declaration->id }}" class="mt-4 block text-sm font-medium text-gray-700">Motif du rejet</label>
+                                <textarea name="motif_rejet" rows="2" required
+                                          id="motif-rejet-{{ $declaration->id }}"
+                                          class="block w-full border-gray-300 rounded-md shadow-sm focus:border-alerte focus:ring-alerte"
+                                          placeholder="Expliquez pourquoi cette déclaration est rejetée..."></textarea>
+                                <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                                    <x-secondary-button x-on:click="$dispatch('close')">Annuler</x-secondary-button>
+                                    <button type="submit"
+                                            class="inline-flex justify-center px-4 py-2 bg-alerte text-white text-xs font-semibold uppercase rounded-md hover:bg-alerte-dark">
+                                        Confirmer le rejet
+                                    </button>
+                                </div>
+                            </form>
+                        </x-modal>
                     </div>
                 @endforeach
 

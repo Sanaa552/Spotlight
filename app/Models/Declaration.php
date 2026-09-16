@@ -57,6 +57,16 @@ class Declaration extends Model
     {
         return $this->hasMany(PieceJointe::class);
     }
+
+    public function piecesPubliques(): HasMany
+    {
+        return $this->hasMany(PieceJointe::class)->where('type_document', 'piece_jointe');
+    }
+
+    public function declarationPerte(): HasOne
+    {
+        return $this->hasOne(PieceJointe::class)->where('type_document', 'declaration_perte');
+    }
     
         public function commentaires(): HasMany
     {

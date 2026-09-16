@@ -51,6 +51,12 @@ class ProfileController extends Controller
      */
     public function destroy(Request $request): RedirectResponse
     {
+        if ($request->user()->isAdministrateur()) {
+            return back()->withErrors([
+                'user' => 'Le compte super administrateur ne peut pas être supprimé depuis l’application.',
+            ], 'userDeletion');
+        }
+
         $request->validateWithBag('userDeletion', [
             'password' => ['required', 'current_password'],
         ]);

@@ -1,0 +1,47 @@
+<?php
+
+return [
+    'array' => 'Le champ :attribute doit contenir une liste valide.',
+    'boolean' => 'Le champ :attribute doit être vrai ou faux.',
+    'confirmed' => 'La confirmation du champ :attribute ne correspond pas.',
+    'email' => 'Le champ :attribute doit être une adresse e-mail valide.',
+    'in' => 'La valeur sélectionnée pour :attribute n’est pas valide.',
+    'max' => [
+        'array' => 'Le champ :attribute ne doit pas contenir plus de :max éléments.',
+        'file' => 'Le fichier :attribute ne doit pas dépasser :max kilo-octets.',
+        'numeric' => 'Le champ :attribute ne doit pas être supérieur à :max.',
+        'string' => 'Le champ :attribute ne doit pas contenir plus de :max caractères.',
+    ],
+    'min' => [
+        'string' => 'Le champ :attribute doit contenir au moins :min caractères.',
+    ],
+    'required' => 'Le champ :attribute est obligatoire.',
+    'required_if' => 'Le champ :attribute est obligatoire dans ce cas.',
+    'numeric' => 'Le champ :attribute doit être un nombre.',
+    'prohibited_unless' => 'Le champ :attribute n’est pas autorisé dans ce cas.',
+    'string' => 'Le champ :attribute doit être un texte valide.',
+    'unique' => 'Cette valeur du champ :attribute est déjà utilisée.',
+    'uploaded' => 'Le fichier :attribute n’a pas pu être envoyé. Vérifiez sa taille et réessayez.',
+    'file' => 'Le champ :attribute doit être un fichier valide.',
+    'mimes' => 'Le fichier :attribute doit être de type :values.',
+
+    'attributes' => [
+        'email' => 'adresse e-mail',
+        'name' => 'nom',
+        'password' => 'mot de passe',
+        'password_confirmation' => 'confirmation du mot de passe',
+        'telephone' => 'téléphone',
+        'type' => 'type de déclaration',
+        'categorie' => 'personne ou objet concerné',
+        'description' => 'description',
+        'lieu' => 'lieu',
+        'type_perte' => 'précision sur la perte',
+        'type_decouverte' => 'précision sur la découverte',
+        'adresse' => 'adresse',
+        'pieces_jointes' => 'pièces jointes',
+        'declaration_perte' => 'déclaration de perte',
+        'role' => 'rôle',
+        'is_blocked' => 'statut du compte',
+        'motif_rejet' => 'motif du rejet',
+    ],
+];
