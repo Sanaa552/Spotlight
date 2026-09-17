@@ -13,7 +13,7 @@ class PublicDeclarationController extends Controller
     {
         $onglet = $request->query('onglet', 'pertes');
 
-        $query = Declaration::query()->with(['localisation', 'piecesPubliques']);
+        $query = Declaration::query()->with('localisation');
 
         $declarations = match ($onglet) {
             'decouvertes' => $query->where('type', 'decouverte')->where('statut', 'validee'),

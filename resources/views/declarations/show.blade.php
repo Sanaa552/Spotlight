@@ -57,6 +57,12 @@
 
                 <p class="mt-4 text-gray-700 whitespace-pre-line">{{ $declaration->description }}</p>
 
+                @if ($declaration->photoUrl())
+                    <img src="{{ $declaration->photoUrl() }}"
+                         alt="Photo publique de {{ $declaration->categorie }}"
+                         class="mt-4 w-full max-h-96 object-contain bg-gray-50 rounded-md">
+                @endif
+
                 @if ($declaration->lieu)
                     <p class="mt-4 flex items-center gap-1.5 text-sm text-gray-500">
                         <x-icon name="location" class="w-4 h-4 text-gray-400" />
@@ -97,7 +103,7 @@
             @endif
 
             @php
-                $piecesPubliques = $declaration->piecesJointes->where('type_document', 'piece_jointe');
+                $justificatifs = $declaration->piecesJointes->where('type_document', 'piece_jointe');
                 $declarationPerte = $declaration->piecesJointes->firstWhere('type_document', 'declaration_perte');
             @endphp
 
@@ -118,24 +124,19 @@
             @endif
 
             {{-- Pièces jointes --}}
-            @if ($piecesPubliques->isNotEmpty())
+            @if ($justificatifs->isNotEmpty())
                 <div class="bg-white shadow-sm border border-gray-100 overflow-hidden rounded-xl p-6">
                     <h4 class="font-semibold text-gray-900 mb-3 flex items-center gap-2">
                         <x-icon name="paperclip" class="w-4 h-4 text-azur" />
-                        Pièces jointes
+                        Justificatifs privés
                     </h4>
                     <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        @foreach ($piecesPubliques as $piece)
+                        @foreach ($justificatifs as $piece)
                             <a href="{{ $piece->url() }}" target="_blank"
                                class="block border border-gray-100 rounded-lg overflow-hidden hover:opacity-80 transition">
-                                @if ($piece->estImage())
-                                    <img src="{{ $piece->url() }}" alt="{{ $piece->nom_original }}"
-                                         class="w-full h-28 object-cover">
-                                @else
-                                    <div class="w-full h-28 flex items-center justify-center bg-gray-50 text-gray-300">
-                                        <x-icon name="paperclip" class="w-8 h-8" />
-                                    </div>
-                                @endif
+                                <div class="w-full h-28 flex items-center justify-center bg-gray-50 text-gray-400">
+                                    <x-icon name="paperclip" class="w-8 h-8" />
+                                </div>
                                 <p class="text-xs text-gray-500 truncate px-2 py-1">{{ $piece->nom_original }}</p>
                             </a>
                         @endforeach

@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Storage;
+use LogicException;
 
 class Declaration extends Model
 {
@@ -20,6 +22,8 @@ class Declaration extends Model
         'type_perte',
         'type_decouverte',
         'photo_path',
+        'facebook_post_id',
+        'instagram_post_id',
         'motif_rejet',
         'cloturee_at',
     ];
@@ -58,14 +62,14 @@ class Declaration extends Model
         return $this->hasMany(PieceJointe::class);
     }
 
-    public function piecesPubliques(): HasMany
-    {
-        return $this->hasMany(PieceJointe::class)->where('type_document', 'piece_jointe');
-    }
-
     public function declarationPerte(): HasOne
     {
         return $this->hasOne(PieceJointe::class)->where('type_document', 'declaration_perte');
+    }
+
+    public function photoUrl(): ?string
+    {
+        return $this->photo_path ? Storage::disk('public')->url($this->photo_path) : null;
     }
     
         public function commentaires(): HasMany
@@ -83,6 +87,10 @@ class Declaration extends Model
 
     public function publier(): static
     {
+        if (! $this->facebook_post_id || ! $this->instagram_post_id) {
+            throw new LogicException('La publication Facebook et Instagram doit être confirmée avant validation.');
+        }
+
         $this->update(['statut' => 'validee']);
 
         return $this;
@@ -90,6 +98,10 @@ class Declaration extends Model
 
     public function cloturer(): static
     {
+        if ($this->statut !== 'validee') {
+            throw new LogicException('Seule une déclaration validée peut être clôturée.');
+        }
+
         $this->update([
             'statut' => 'cloturee',
             'cloturee_at' => now(),

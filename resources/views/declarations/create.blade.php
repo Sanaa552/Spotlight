@@ -25,10 +25,11 @@
                           fileError: '',
                           validateFiles(event) {
                               const attachments = Array.from(this.$refs.attachments.files);
+                              const publicPhoto = Array.from(this.$refs.publicPhoto.files);
                               const lossReport = this.type === 'perte'
                                   ? Array.from(this.$refs.lossReport.files)
                                   : [];
-                              const files = [...attachments, ...lossReport];
+                              const files = [...attachments, ...lossReport, ...publicPhoto];
                               const oversized = files.find(file => file.size > 10 * 1024 * 1024);
                               const total = files.reduce((size, file) => size + file.size, 0);
 
@@ -131,15 +132,24 @@
                         </div>
                     </fieldset>
 
-                    {{-- Pièces jointes (multiple) --}}
                     <div>
-                        <x-input-label for="pieces_jointes" value="Photos et documents complémentaires (5 max, 10 Mo chacun)" />
+                        <x-input-label for="photo_publique" value="Photo publique de la personne ou de l’objet" />
+                        <input id="photo_publique" name="photo_publique" type="file" required
+                               accept=".jpg,.jpeg,image/jpeg"
+                               x-ref="publicPhoto"
+                               x-on:change="validateFiles($event)"
+                               class="mt-1 block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-sonar/10 file:text-sonar-dark hover:file:bg-sonar/20" />
+                        <p class="mt-1 text-xs text-gray-500">JPG ou JPEG, 10 Mo maximum. Cette photo sera visible dans Spotlight et utilisée pour Facebook et Instagram.</p>
+                    </div>
+
+                    <div>
+                        <x-input-label for="pieces_jointes" value="Justificatifs privés (5 max, 10 Mo chacun)" />
                         <input id="pieces_jointes" name="pieces_jointes[]" type="file" multiple
                                accept=".jpg,.jpeg,.png,.pdf"
                                x-ref="attachments"
                                x-on:change="validateFiles($event)"
                                class="mt-1 block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-azur/10 file:text-azur hover:file:bg-azur/20" />
-                        <p class="mt-1 text-xs text-gray-500">Formats acceptés : JPG, JPEG, PNG et PDF. Taille totale maximale : 60 Mo.</p>
+                        <p class="mt-1 text-xs text-gray-500">CNI, passeport et autres preuves : JPG, JPEG, PNG ou PDF. Visibles uniquement par vous et la modération. Taille totale maximale : 60 Mo.</p>
                         <p x-show="fileError" x-text="fileError" class="mt-2 text-sm font-medium text-alerte" style="display:none"></p>
                     </div>
 

@@ -33,6 +33,9 @@
                                     <x-type-badge :type="$declaration->type" />
                                     <x-status-badge :statut="$declaration->statut" />
                                     <span class="text-xs text-gray-400">#{{ $declaration->id }}</span>
+                                    @if ($declaration->facebook_post_id && ! $declaration->instagram_post_id)
+                                        <span class="text-xs font-medium text-azur">Facebook publié · Instagram à reprendre</span>
+                                    @endif
                                 </div>
 
                                 <h3 class="font-semibold text-gray-900">{{ $declaration->categorie }}</h3>
@@ -76,7 +79,10 @@
                                 @csrf
                                 <h2 class="text-lg font-semibold text-gray-900">Valider cette déclaration ?</h2>
                                 <p class="mt-2 text-sm leading-6 text-gray-600">
-                                    La déclaration <strong>#{{ $declaration->id }}</strong> sera rendue publique et Spotlight tentera de la publier sur les réseaux sociaux.
+                                    La déclaration <strong>#{{ $declaration->id }}</strong> sera rendue publique seulement après confirmation des publications Facebook et Instagram.
+                                    @if ($declaration->facebook_post_id)
+                                        Facebook est déjà publié et ne sera pas republié.
+                                    @endif
                                 </p>
                                 <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                                     <x-secondary-button x-on:click="$dispatch('close')">Annuler</x-secondary-button>

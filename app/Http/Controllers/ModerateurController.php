@@ -8,8 +8,11 @@ use App\Models\User;
 use App\Services\MetaPublishingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use Throwable;
 
 class ModerateurController extends Controller
 {
@@ -31,80 +34,96 @@ class ModerateurController extends Controller
     public function valider(Request $request, Declaration $declaration): RedirectResponse
     {
         $moderateur = $request->user();
+        $lock = Cache::lock('validation-declaration-'.$declaration->id, 300);
 
-        if ($declaration->statut !== 'en_attente') {
-            Log::notice('Validation declaration ignoree Spotlight', [
+        if (! $lock->get()) {
+            return back()->with('warning', 'Une publication de cette déclaration est déjà en cours. Réessayez dans quelques instants.');
+        }
+
+        try {
+            $declaration->refresh()->load('localisation');
+
+            if ($declaration->statut !== 'en_attente') {
+                return back()->with('warning', 'Cette déclaration a déjà été traitée. Actualisez la liste.');
+            }
+
+            if (! $declaration->photo_path || ! Storage::disk('public')->exists($declaration->photo_path)) {
+                Log::warning('Publication impossible sans photo publique Spotlight', [
+                    'declaration_id' => $declaration->id,
+                    'moderateur_id' => $moderateur->id,
+                ]);
+
+                return back()->with('warning', 'Cette déclaration ne possède pas de photo publique. Elle reste en attente ; contactez l’administrateur.');
+            }
+
+            $imageUrl = $declaration->photoUrl();
+            $message = $this->messagePublication($declaration);
+
+            if (! $declaration->facebook_post_id) {
+                $facebookResponse = $this->metaPublishingService->publishToFacebook($message, $imageUrl);
+                Log::log($facebookResponse['success'] ? 'info' : 'warning', 'Publication Facebook Spotlight', [
+                    'declaration_id' => $declaration->id,
+                    'moderateur_id' => $moderateur->id,
+                    'result' => $facebookResponse,
+                ]);
+
+                $facebookId = $facebookResponse['response']['id'] ?? null;
+                if (! $facebookResponse['success'] || ! $facebookId) {
+                    return back()->with('warning', 'Publication Facebook non confirmée. La déclaration reste en attente ; contactez l’administrateur si nécessaire.');
+                }
+
+                $declaration->update(['facebook_post_id' => $facebookId]);
+            }
+
+            if (! $declaration->instagram_post_id) {
+                $instagramResponse = $this->metaPublishingService->publishToInstagram($imageUrl, $message);
+                Log::log($instagramResponse['success'] ? 'info' : 'warning', 'Publication Instagram Spotlight', [
+                    'declaration_id' => $declaration->id,
+                    'moderateur_id' => $moderateur->id,
+                    'result' => $instagramResponse,
+                ]);
+
+                $instagramId = $instagramResponse['response']['id'] ?? null;
+                if (! $instagramResponse['success'] || ! $instagramId) {
+                    return back()->with('warning', 'Facebook a été publié, mais Instagram n’a pas confirmé la publication. La déclaration reste en attente ; réessayez après correction. Facebook ne sera pas republié.');
+                }
+
+                $declaration->update(['instagram_post_id' => $instagramId]);
+            }
+
+            $declaration->publier();
+            $declaration->update(['moderateur_id' => $moderateur->id]);
+
+            try {
+                $this->notifierCitoyen($declaration, "Votre déclaration #{$declaration->id} a été validée.");
+            } catch (Throwable $exception) {
+                Log::error('Notification citoyen apres validation impossible Spotlight', [
+                    'declaration_id' => $declaration->id,
+                    'exception' => $exception::class,
+                    'message' => $exception->getMessage(),
+                ]);
+            }
+
+            Log::info('Declaration validee apres publications Meta Spotlight', [
                 'declaration_id' => $declaration->id,
                 'moderateur_id' => $moderateur->id,
-                'statut' => $declaration->statut,
+                'facebook_post_id' => $declaration->facebook_post_id,
+                'instagram_post_id' => $declaration->instagram_post_id,
             ]);
 
-            return back()->with('warning', 'Cette déclaration a déjà été traitée. Actualisez la liste.');
-        }
-
-        $declaration->update([
-            'statut' => 'validee',
-            'moderateur_id' => $moderateur->id,
-        ]);
-
-        $declaration->load('piecesJointes', 'localisation');
-
-        $message = $this->messagePublication($declaration);
-        $pieceJointe = $declaration->piecesJointes->first(
-            fn ($piece) => ! $piece->estDeclarationPerte() && $piece->estImage()
-        );
-        $imageUrl = $pieceJointe?->url();
-
-        Log::info('Validation declaration Spotlight', [
-            'declaration_id' => $declaration->id,
-            'moderateur_id' => $moderateur->id,
-            'type' => $declaration->type,
-            'categorie' => $declaration->categorie,
-            'has_image' => filled($imageUrl),
-            'image_url' => $imageUrl,
-        ]);
-
-        $facebookResponse = $this->metaPublishingService->publishToFacebook($message, $imageUrl);
-
-        $facebookLogLevel = $facebookResponse['success'] ? 'info' : 'warning';
-        Log::$facebookLogLevel('Publication Facebook Spotlight', [
-            'declaration_id' => $declaration->id,
-            'image_url' => $imageUrl,
-            'result' => $facebookResponse,
-        ]);
-
-        $instagramResponse = null;
-
-        if ($imageUrl) {
-            $instagramResponse = $this->metaPublishingService->publishToInstagram($imageUrl, $message);
-
-            $instagramLogLevel = $instagramResponse['success'] ? 'info' : 'warning';
-            Log::$instagramLogLevel('Publication Instagram Spotlight', [
+            return back()->with('success', 'Déclaration validée et publiée sur Facebook et Instagram.');
+        } catch (Throwable $exception) {
+            Log::error('Echec technique validation declaration Spotlight', [
                 'declaration_id' => $declaration->id,
-                'image_url' => $imageUrl,
-                'result' => $instagramResponse,
+                'moderateur_id' => $moderateur->id,
+                'exception' => $exception::class,
+                'message' => $exception->getMessage(),
             ]);
-        } else {
-            Log::notice('Publication Instagram ignoree Spotlight', [
-                'declaration_id' => $declaration->id,
-                'reason' => 'Aucune image jointe. Instagram exige une image.',
-            ]);
+
+            return back()->with('warning', 'La validation n’a pas pu être terminée. La déclaration reste en attente ; contactez l’administrateur si le problème persiste.');
+        } finally {
+            $lock->release();
         }
-
-        // 7. Notifier le citoyen
-        $this->notifierCitoyen(
-            $declaration,
-            "Votre déclaration #{$declaration->id} a été validée."
-        );
-
-        if (! $facebookResponse['success'] || ($instagramResponse && ! $instagramResponse['success'])) {
-            return back()
-                ->with('warning', 'Déclaration validée, mais sa publication sur au moins un réseau social a échoué. Contactez l’administrateur si nécessaire.');
-        }
-
-        return back()->with('success', $imageUrl
-            ? 'Déclaration validée et publiée sur Facebook/Instagram.'
-            : 'Déclaration validée et publiée sur Facebook. Instagram ignoré car aucune image n’est jointe.');
     }
 
     /** Rejeter une déclaration */

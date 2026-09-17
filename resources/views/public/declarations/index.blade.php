@@ -49,10 +49,9 @@
         @else
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 @foreach ($declarations as $declaration)
-                    @php($cover = $declaration->piecesPubliques->first(fn ($piece) => $piece->estImage()))
                     <div class="bg-white/5 border border-white/10 rounded-lg overflow-hidden">
-                        @if ($cover)
-                            <img src="{{ $cover->url() }}"
+                        @if ($declaration->photoUrl())
+                            <img src="{{ $declaration->photoUrl() }}"
                                  alt="{{ $declaration->categorie }}"
                                  class="w-full h-48 object-cover">
                         @else

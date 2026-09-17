@@ -41,6 +41,7 @@ class DeclarationController extends Controller
     {
         $files = collect($request->file('pieces_jointes', []))->filter();
         $declarationPerte = $request->file('declaration_perte');
+        $photoPublique = $request->file('photo_publique');
         $fileDiagnostics = $files->map(fn ($file) => $this->fileDiagnostic($file))->values()->all();
 
         Log::info('Tentative de soumission declaration Spotlight', [
@@ -49,6 +50,7 @@ class DeclarationController extends Controller
             'categorie' => $request->input('categorie'),
             'files' => $fileDiagnostics,
             'declaration_perte' => $declarationPerte ? $this->fileDiagnostic($declarationPerte) : null,
+            'photo_publique' => $photoPublique ? $this->fileDiagnostic($photoPublique) : null,
         ]);
 
         $validator = Validator::make($request->all(), [
@@ -63,6 +65,7 @@ class DeclarationController extends Controller
             'longitude' => ['nullable', 'numeric'],
             'pieces_jointes' => ['nullable', 'array', 'max:'.config('spotlight.uploads.max_files')],
             'pieces_jointes.*' => ['file', 'mimes:jpg,jpeg,png,pdf', 'max:'.config('spotlight.uploads.max_file_kilobytes')],
+            'photo_publique' => ['required', 'image', 'mimes:jpg,jpeg', 'max:'.config('spotlight.uploads.max_file_kilobytes')],
             'declaration_perte' => ['required_if:type,perte', 'prohibited_unless:type,perte', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:'.config('spotlight.uploads.max_file_kilobytes')],
         ], [
             'pieces_jointes.max' => 'Vous pouvez joindre au maximum :max fichiers.',
@@ -70,6 +73,11 @@ class DeclarationController extends Controller
             'pieces_jointes.*.mimes' => 'Chaque pièce jointe doit être une image JPG, JPEG, PNG ou un document PDF.',
             'pieces_jointes.*.max' => 'Chaque pièce jointe doit peser au maximum 10 Mo.',
             'pieces_jointes.*.uploaded' => 'Une pièce jointe n’a pas pu être envoyée. Vérifiez qu’elle ne dépasse pas 10 Mo.',
+            'photo_publique.required' => 'Ajoutez la photo publique de la personne ou de l’objet concerné.',
+            'photo_publique.image' => 'La photo publique doit être une image valide.',
+            'photo_publique.mimes' => 'La photo publique doit être au format JPG ou JPEG.',
+            'photo_publique.max' => 'La photo publique doit peser au maximum 10 Mo.',
+            'photo_publique.uploaded' => 'La photo publique n’a pas pu être envoyée. Vérifiez qu’elle ne dépasse pas 10 Mo.',
             'declaration_perte.required_if' => 'Le document de déclaration de perte est obligatoire pour signaler une perte.',
             'declaration_perte.prohibited_unless' => 'Le document de déclaration de perte ne doit être joint que pour une perte.',
             'declaration_perte.file' => 'La déclaration de perte sélectionnée n’est pas un fichier valide.',
@@ -79,12 +87,14 @@ class DeclarationController extends Controller
         ], [
             'pieces_jointes' => 'pièces jointes',
             'pieces_jointes.*' => 'pièce jointe',
+            'photo_publique' => 'photo publique',
             'declaration_perte' => 'déclaration de perte',
         ]);
 
-        $validator->after(function ($validator) use ($files, $declarationPerte) {
+        $validator->after(function ($validator) use ($files, $declarationPerte, $photoPublique) {
             $totalBytes = $files->sum(fn ($file) => (int) $file->getSize())
-                + ($declarationPerte ? (int) $declarationPerte->getSize() : 0);
+                + ($declarationPerte ? (int) $declarationPerte->getSize() : 0)
+                + ($photoPublique ? (int) $photoPublique->getSize() : 0);
             $maxTotalBytes = (int) config('spotlight.uploads.max_total_kilobytes') * 1024;
 
             if ($totalBytes > $maxTotalBytes) {
@@ -98,6 +108,7 @@ class DeclarationController extends Controller
                 'errors' => $validator->errors()->toArray(),
                 'files' => $fileDiagnostics,
                 'declaration_perte' => $declarationPerte ? $this->fileDiagnostic($declarationPerte) : null,
+                'photo_publique' => $photoPublique ? $this->fileDiagnostic($photoPublique) : null,
             ]);
 
             return back()->withErrors($validator)->withInput();
@@ -107,9 +118,9 @@ class DeclarationController extends Controller
         $storedPaths = [];
 
         try {
-            $declaration = DB::transaction(function () use ($request, $validated, $declarationPerte, &$storedPaths) {
+            $declaration = DB::transaction(function () use ($request, $validated, $declarationPerte, $photoPublique, &$storedPaths) {
                 $declaration = $request->user()->declarations()->create([
-                    ...collect($validated)->except(['adresse', 'latitude', 'longitude', 'pieces_jointes', 'declaration_perte'])->toArray(),
+                    ...collect($validated)->except(['adresse', 'latitude', 'longitude', 'pieces_jointes', 'declaration_perte', 'photo_publique'])->toArray(),
                     'statut' => 'en_attente',
                 ]);
 
@@ -120,12 +131,19 @@ class DeclarationController extends Controller
                     'longitude' => $validated['longitude'] ?? null,
                 ]);
 
+                $photoPath = $photoPublique->store('photos-publiques', 'public');
+                if (! $photoPath) {
+                    throw new RuntimeException('Le stockage public a refusé la photo.');
+                }
+                $storedPaths[] = ['disk' => 'public', 'path' => $photoPath];
+                $declaration->update(['photo_path' => $photoPath]);
+
                 foreach ($request->file('pieces_jointes', []) as $fichier) {
-                    $this->storeAttachment($declaration, $fichier, 'piece_jointe', 'public', $storedPaths);
+                    $this->storeAttachment($declaration, $fichier, 'piece_jointe', $storedPaths);
                 }
 
                 if ($declarationPerte) {
-                    $this->storeAttachment($declaration, $declarationPerte, 'declaration_perte', 'local', $storedPaths);
+                    $this->storeAttachment($declaration, $declarationPerte, 'declaration_perte', $storedPaths);
                 }
 
                 return $declaration;
@@ -156,6 +174,7 @@ class DeclarationController extends Controller
             'categorie' => $declaration->categorie,
             'pieces_jointes_count' => $declaration->piecesJointes()->count(),
             'has_declaration_perte' => $declaration->declarationPerte()->exists(),
+            'has_photo_publique' => filled($declaration->photo_path),
             'has_coordinates' => filled($validated['latitude'] ?? null) && filled($validated['longitude'] ?? null),
         ]);
 
@@ -200,7 +219,12 @@ class DeclarationController extends Controller
     /** Confirmer restitution : clôture la déclaration */
     public function confirmerRestitution(Declaration $declaration): RedirectResponse
     {
-        $this->authorizeOwner($declaration);
+        abort_unless(
+            request()->user()->isCitoyen()
+                && $declaration->user_id === request()->user()->id
+                && $declaration->statut === 'validee',
+            403
+        );
 
         $declaration->cloturer();
 
@@ -231,13 +255,10 @@ class DeclarationController extends Controller
         Declaration $declaration,
         UploadedFile $file,
         string $documentType,
-        string $disk,
         array &$storedPaths,
     ): void {
-        $directory = $documentType === 'declaration_perte'
-            ? 'declarations-privees'
-            : 'declarations';
-        $path = $file->store($directory, $disk);
+        $disk = 'local';
+        $path = $file->store('declarations-privees', $disk);
 
         if (! $path) {
             throw new RuntimeException("Le stockage {$disk} a refusé un fichier.");

@@ -23,8 +23,6 @@
                 <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
                     @foreach ($declarations as $declaration)
                         @php
-                            $photos = $declaration->piecesPubliques->filter->estImage()->values();
-                            $documents = $declaration->piecesPubliques->reject->estImage()->values();
                             $detailRoute = auth()->user()->isCitoyen()
                                 ? route('declarations.show', $declaration)
                                 : route('moderation.declarations.show', $declaration);
@@ -62,35 +60,12 @@
                                 @endif
                             </div>
 
-                            @if ($photos->isNotEmpty())
-                                <a href="{{ $detailRoute }}"
-                                   class="mt-3 grid overflow-hidden {{ $photos->count() > 1 ? 'grid-cols-2 gap-0.5' : 'grid-cols-1' }}">
-                                    @foreach ($photos->take(4) as $photo)
-                                        <span class="relative block">
-                                            <img src="{{ $photo->url() }}"
-                                                 alt="{{ $photo->nom_original }}"
-                                                 class="w-full object-cover {{ $photos->count() === 1 ? 'h-56' : 'h-36' }}">
-                                            @if ($loop->last && $photos->count() > 4)
-                                                <span class="absolute inset-0 flex items-center justify-center bg-black/60 text-lg font-semibold text-white">
-                                                    +{{ $photos->count() - 4 }}
-                                                </span>
-                                            @endif
-                                        </span>
-                                    @endforeach
+                            @if ($declaration->photoUrl())
+                                <a href="{{ $detailRoute }}" class="mt-3 block overflow-hidden">
+                                    <img src="{{ $declaration->photoUrl() }}"
+                                         alt="Photo de {{ $declaration->type_perte ?? $declaration->type_decouverte ?? $declaration->categorie }}"
+                                         class="h-56 w-full object-cover">
                                 </a>
-                            @endif
-
-                            @if ($documents->isNotEmpty())
-                                <div class="mx-4 mt-3 space-y-2">
-                                    @foreach ($documents->take(2) as $document)
-                                        <a href="{{ $document->url() }}" target="_blank"
-                                           class="flex min-w-0 items-center gap-2 border-t border-gray-100 pt-2 text-xs text-azur hover:text-azur-dark">
-                                            <x-icon name="paperclip" class="h-4 w-4 shrink-0" />
-                                            <span class="truncate">{{ $document->nom_original }}</span>
-                                            <span class="ml-auto shrink-0 text-gray-400">{{ number_format(($document->taille ?? 0) / 1024 / 1024, 1, ',', ' ') }} Mo</span>
-                                        </a>
-                                    @endforeach
-                                </div>
                             @endif
 
                             <div class="px-4 py-3 flex items-center justify-between border-t border-gray-100 mt-2">

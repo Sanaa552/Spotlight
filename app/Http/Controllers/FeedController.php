@@ -15,7 +15,7 @@ class FeedController extends Controller
     public function index(): View
     {
         $declarations = Declaration::whereIn('statut', ['validee', 'cloturee'])
-            ->with(['citoyen', 'localisation', 'piecesPubliques', 'commentaires.auteur'])
+            ->with(['citoyen', 'localisation', 'commentaires.auteur'])
             ->latest()
             ->paginate(8);
 

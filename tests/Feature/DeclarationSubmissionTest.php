@@ -27,6 +27,7 @@ class DeclarationSubmissionTest extends TestCase
             'description' => 'Portefeuille noir perdu au marché central.',
             'lieu' => 'Marché central de Douala',
             'adresse' => 'Marché central, Akwa, Douala',
+            'photo_publique' => UploadedFile::fake()->create('portefeuille.jpg', 1024, 'image/jpeg'),
             'declaration_perte' => UploadedFile::fake()->create('declaration-perte.pdf', 2048, 'application/pdf'),
             'pieces_jointes' => [UploadedFile::fake()->create('justificatif.pdf', 1024, 'application/pdf')],
         ]);
@@ -42,6 +43,12 @@ class DeclarationSubmissionTest extends TestCase
             'type_document' => 'declaration_perte',
             'disque' => 'local',
         ]);
+        $this->assertDatabaseHas('pieces_jointes', [
+            'type_document' => 'piece_jointe',
+            'disque' => 'local',
+        ]);
+        $this->assertNotNull(Declaration::firstOrFail()->photo_path);
+        Storage::disk('public')->assertExists(Declaration::firstOrFail()->photo_path);
     }
 
     public function test_attachment_larger_than_ten_megabytes_is_rejected_in_french(): void
@@ -58,6 +65,7 @@ class DeclarationSubmissionTest extends TestCase
                 'type_perte' => 'Portefeuille perdu',
                 'description' => 'Portefeuille noir perdu au marché central.',
                 'adresse' => 'Marché central, Akwa, Douala',
+                'photo_publique' => UploadedFile::fake()->create('portefeuille.jpg', 1024, 'image/jpeg'),
                 'declaration_perte' => UploadedFile::fake()->create('declaration-perte.pdf', 1024, 'application/pdf'),
                 'pieces_jointes' => [UploadedFile::fake()->create('document.pdf', 11264, 'application/pdf')],
             ]);
@@ -84,6 +92,7 @@ class DeclarationSubmissionTest extends TestCase
                 'type_perte' => 'Personne disparue',
                 'description' => 'Signalement suffisamment détaillé.',
                 'adresse' => 'Douala',
+                'photo_publique' => UploadedFile::fake()->create('personne.jpg', 1024, 'image/jpeg'),
             ]);
 
         $lossResponse->assertSessionHasErrors([
@@ -96,6 +105,7 @@ class DeclarationSubmissionTest extends TestCase
             'type_decouverte' => 'Téléphone trouvé',
             'description' => 'Téléphone trouvé près du marché.',
             'adresse' => 'Douala',
+            'photo_publique' => UploadedFile::fake()->create('telephone.jpg', 1024, 'image/jpeg'),
         ]);
 
         $discoveryResponse
@@ -119,12 +129,19 @@ class DeclarationSubmissionTest extends TestCase
             'type_perte' => 'Personne disparue',
             'description' => 'Signalement suffisamment détaillé.',
             'adresse' => 'Douala',
+            'photo_publique' => UploadedFile::fake()->create('portrait.jpg', 1024, 'image/jpeg'),
             'declaration_perte' => UploadedFile::fake()->create('declaration-privee.pdf', 1024, 'application/pdf'),
+            'pieces_jointes' => [UploadedFile::fake()->create('cni.jpg', 1024, 'image/jpeg')],
         ])->assertSessionHasNoErrors();
 
         $declaration = Declaration::firstOrFail();
         $declaration->update(['statut' => 'validee']);
         $lossReport = PieceJointe::where('type_document', 'declaration_perte')->firstOrFail();
+        $identityDocument = PieceJointe::where('nom_original', 'cni.jpg')->firstOrFail();
+
+        $this->assertSame('local', $identityDocument->disque);
+        Storage::disk('local')->assertExists($identityDocument->chemin);
+        Storage::disk('public')->assertMissing($identityDocument->chemin);
 
         $this->actingAs($owner)
             ->get(route('pieces-jointes.telecharger', $lossReport))
@@ -134,14 +151,45 @@ class DeclarationSubmissionTest extends TestCase
         $this->actingAs($otherCitizen)
             ->get(route('pieces-jointes.telecharger', $lossReport))
             ->assertForbidden();
+        $this->actingAs($otherCitizen)
+            ->get(route('pieces-jointes.telecharger', $identityDocument))
+            ->assertForbidden();
 
         $this->actingAs($moderator)
             ->get(route('pieces-jointes.telecharger', $lossReport))
             ->assertOk();
+        $this->actingAs($moderator)
+            ->get(route('pieces-jointes.telecharger', $identityDocument))
+            ->assertDownload('cni.jpg');
 
         $this->actingAs($otherCitizen)
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertDontSee('declaration-privee.pdf');
+            ->assertDontSee('declaration-privee.pdf')
+            ->assertDontSee('cni.jpg');
+
+        $this->get(route('public.declarations.index'))
+            ->assertOk()
+            ->assertDontSee('declaration-privee.pdf')
+            ->assertDontSee('cni.jpg')
+            ->assertSee('photos-publiques/', false);
+    }
+
+    public function test_public_photo_is_required_and_private_attachment_cannot_replace_it(): void
+    {
+        Storage::fake('local');
+        Storage::fake('public');
+        $citizen = User::factory()->create();
+
+        $this->actingAs($citizen)->post(route('declarations.store'), [
+            'type' => 'decouverte',
+            'categorie' => 'objet',
+            'type_decouverte' => 'Téléphone trouvé',
+            'description' => 'Téléphone trouvé près du marché.',
+            'adresse' => 'Douala',
+            'pieces_jointes' => [UploadedFile::fake()->create('preuve.jpg', 1024, 'image/jpeg')],
+        ])->assertSessionHasErrors('photo_publique');
+
+        $this->assertDatabaseCount('declarations', 0);
     }
 }
