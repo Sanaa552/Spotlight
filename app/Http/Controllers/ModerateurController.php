@@ -42,11 +42,6 @@ class ModerateurController extends Controller
             return back()->with('warning', 'Cette déclaration a déjà été traitée. Actualisez la liste.');
         }
 
-        $declaration->update([
-            'statut' => 'validee',
-            'moderateur_id' => $moderateur->id,
-        ]);
-
         $declaration->load('piecesJointes', 'localisation');
 
         $message = $this->messagePublication($declaration);
@@ -91,20 +86,52 @@ class ModerateurController extends Controller
             ]);
         }
 
-        // 7. Notifier le citoyen
-        $this->notifierCitoyen(
-            $declaration,
-            "Votre déclaration #{$declaration->id} a été validée."
-        );
+        
+         // 6. Vérifier que les publications obligatoires ont réussi 
 
-        if (! $facebookResponse['success'] || ($instagramResponse && ! $instagramResponse['success'])) {
-            return back()
-                ->with('warning', 'Déclaration validée, mais sa publication sur au moins un réseau social a échoué. Contactez l’administrateur si nécessaire.');
-        }
+         $facebookOk = $facebookResponse['success'] ?? false; 
+         // Si une image existe, Instagram est obligatoire. 
+         // S'il n'y a pas d'image, Instagram est impossible et est donc ignoré. 
+         $instagramOk = $imageUrl ? ($instagramResponse['success'] ?? false) : true; 
+          
+         if (! $facebookOk || ! $instagramOk) { 
+            Log::warning('Validation annulee : publication Meta incomplete Spotlight', [ 
+                'declaration_id' => $declaration->id, 
+                'moderateur_id' => $moderateur->id, 
+                'facebook_success' => $facebookOk, 
+                'instagram_success' => $instagramOk, 
+                'facebook_result' => $facebookResponse, 
+                'instagram_result' => $instagramResponse, ]); 
 
-        return back()->with('success', $imageUrl
-            ? 'Déclaration validée et publiée sur Facebook/Instagram.'
-            : 'Déclaration validée et publiée sur Facebook. Instagram ignoré car aucune image n’est jointe.');
+                return back()->with(
+                    'error', 
+                    'La déclaration n’a pas été validée car la publication sur Facebook ou Instagram a échoué. Vérifiez la connexion aux réseaux sociaux puis réessayez.' 
+                    ); 
+                }
+
+                 // 7. Les publications ont réussi :
+                 // maintenant seulement, on valide la déclaration. 
+                 $declaration->update([
+                    'statut' => 'validee', 
+                    'moderateur_id' => $moderateur->id, 
+                ]); 
+                 
+            // 8. Notifier le citoyen uniquement après validation complète 
+            $this->notifierCitoyen( 
+                $declaration, 
+                "Votre déclaration #{$declaration->id} a été validée et publiée sur les réseaux sociaux."
+            ); 
+            Log::info('Declaration validee et publiee Spotlight', [ 
+                'declaration_id' => $declaration->id, 
+                'moderateur_id' => $moderateur->id, 
+                'facebook_success' => $facebookOk, 
+                'instagram_success' => $instagramOk, 
+            ]); 
+                
+                return back()->with( 
+                    'success', 
+                    'Déclaration validée et publiée avec succès sur Facebook et Instagram.' 
+                );
     }
 
     /** Rejeter une déclaration */

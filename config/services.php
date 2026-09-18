@@ -49,3 +49,4 @@ return [
     ],
 
 ];
+$response->body();
