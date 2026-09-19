@@ -55,7 +55,7 @@ class DeclarationController extends Controller
     }
 
     /** Déclarer une perte / une découverte (+ joindre photos/pièces justificatives, localisation) */
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): RedirectResponse|JsonResponse
     {
         $files = collect($request->file('pieces_jointes', []))->filter();
         $declarationPerte = $request->file('declaration_perte');
@@ -84,7 +84,7 @@ class DeclarationController extends Controller
                 'filename' => $photoPublique->getClientOriginalName(),
             ]);
 
-            return back()->withInput()->withErrors([
+            return $this->submissionFailure($request, [
                 'photo_publique' => 'La photo reçue est vide. Actualisez la page et sélectionnez à nouveau le fichier original.',
             ]);
         }
@@ -189,7 +189,7 @@ class DeclarationController extends Controller
                 'photo_publique' => $photoPublique ? $this->fileDiagnostic($photoPublique) : null,
             ]);
 
-            return back()->withErrors($validator)->withInput();
+            return $this->submissionFailure($request, $validator->errors()->toArray());
         }
 
         $validated = $validator->validated();
@@ -259,9 +259,9 @@ class DeclarationController extends Controller
                 'message' => $exception->getMessage(),
             ]);
 
-            return back()
-                ->withInput()
-                ->withErrors(['declaration' => 'La déclaration n’a pas pu être enregistrée. Réessayez et, si le problème persiste, contactez l’administrateur.']);
+            return $this->submissionFailure($request, [
+                'declaration' => 'La déclaration n’a pas pu être enregistrée. Réessayez et, si le problème persiste, contactez l’administrateur.',
+            ]);
         }
 
         Log::info('Declaration soumise Spotlight', [
@@ -279,15 +279,29 @@ class DeclarationController extends Controller
             app(RapprochementNotifier::class)->proposition($declaration->rapprochementDecouverte);
         }
 
-        if ($declaration->type === 'decouverte' && $declaration->categorie === 'objet') {
-            return redirect()
-                ->route('declarations.show', $declaration)
-                ->with('success', 'Déclaration soumise avec succès.');
+        $destination = $declaration->type === 'decouverte' && $declaration->categorie === 'objet'
+            ? route('declarations.show', $declaration)
+            : route('declarations.index');
+
+        if ($request->expectsJson()) {
+            $request->session()->flash('success', 'Déclaration soumise avec succès.');
+
+            return response()->json(['redirect' => $destination], 201);
         }
 
-        return redirect()
-            ->route('declarations.index')
-            ->with('success', 'Déclaration soumise avec succès.');
+        return redirect()->to($destination)->with('success', 'Déclaration soumise avec succès.');
+    }
+
+    private function submissionFailure(Request $request, array $errors): RedirectResponse|JsonResponse
+    {
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'La déclaration n’a pas été envoyée. Vérifiez les points indiqués.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        return back()->withInput()->withErrors($errors);
     }
 
     public function publicationStatus(Declaration $declaration): JsonResponse

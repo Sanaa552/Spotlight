@@ -20,10 +20,59 @@
                 @endif
 
                 <form method="POST" action="{{ route('declarations.store') }}" enctype="multipart/form-data"
+                      x-on:submit.prevent="submitDeclaration($event)"
+                      x-on:pageshow.window="submitting = false"
                       x-data="{
                           type: '{{ old('type', $defaultType) }}',
                           categorie: '{{ old('categorie', $defaultCategory) }}',
                           fileError: '',
+                          submitting: false,
+                          submitErrors: [],
+                          uncertainSubmission: false,
+                          async submitDeclaration(event) {
+                              if (this.submitting) return;
+                              this.fileError = '';
+                              this.submitting = true;
+                              this.submitErrors = [];
+                              this.uncertainSubmission = false;
+                              let completed = false;
+
+                              try {
+                                  const response = await fetch(event.target.action, {
+                                      method: 'POST',
+                                      body: new FormData(event.target),
+                                      headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                                      credentials: 'same-origin',
+                                  });
+                                  const result = await response.json().catch(() => null);
+
+                                  if (response.ok && result?.redirect) {
+                                      completed = true;
+                                      window.location.assign(result.redirect);
+                                      return;
+                                  }
+
+                                  if (response.status === 422) {
+                                      this.submitErrors = Object.values(result?.errors || {}).flat();
+                                      if (!this.submitErrors.length) this.submitErrors = ['Vérifiez les informations du formulaire.'];
+                                  } else if (response.status === 413) {
+                                      this.submitErrors = ['Les fichiers dépassent la taille autorisée par le serveur. Réduisez leur taille avant de réessayer.'];
+                                  } else if ([401, 419].includes(response.status) || response.redirected) {
+                                      this.submitErrors = ['Votre session a expiré. Reconnectez-vous dans un autre onglet, puis rechargez ce formulaire avant un nouvel envoi.'];
+                                  } else {
+                                      this.uncertainSubmission = true;
+                                      this.submitErrors = ['L’envoi n’a pas pu être confirmé. Vérifiez d’abord Mes déclarations avant de réessayer ; si le problème persiste, contactez l’administrateur.'];
+                                  }
+                              } catch (_) {
+                                  this.uncertainSubmission = true;
+                                  this.submitErrors = ['Connexion interrompue : l’envoi n’a pas pu être confirmé. Vérifiez d’abord Mes déclarations avant de réessayer.'];
+                              } finally {
+                                  if (!completed) {
+                                      this.submitting = false;
+                                      this.$nextTick(() => this.$refs.submitErrors?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+                                  }
+                              }
+                          },
                           validateFiles(event) {
                               const attachments = Array.from(this.$refs.attachments.files);
                               const publicPhoto = Array.from(this.$refs.publicPhoto.files);
@@ -55,6 +104,18 @@
                       }"
                       class="space-y-6">
                     @csrf
+
+                    <div x-show="submitErrors.length" x-cloak x-ref="submitErrors" role="alert"
+                         class="border border-alerte/30 bg-alerte/10 px-4 py-3 text-sm text-alerte-dark">
+                        <p class="font-semibold">La déclaration n’a pas été envoyée.</p>
+                        <ul class="mt-2 list-inside list-disc space-y-1">
+                            <template x-for="(error, index) in submitErrors" :key="index">
+                                <li x-text="error"></li>
+                            </template>
+                        </ul>
+                        <a x-show="uncertainSubmission" href="{{ route('declarations.index') }}" target="_blank" rel="noopener noreferrer"
+                           class="mt-2 inline-block font-semibold underline">Vérifier Mes déclarations</a>
+                    </div>
 
                     {{-- Type de déclaration --}}
                     <div>
@@ -226,16 +287,22 @@
                         <p x-show="fileError" x-text="fileError" class="mt-2 text-sm font-medium text-alerte" style="display:none"></p>
                     </div>
 
-                    <div class="flex justify-end gap-3 pt-4 border-t">
+                    <div class="flex flex-col-reverse items-stretch gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-end">
                         <a href="{{ route('declarations.index') }}"
-                           class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900">
+                           class="px-4 py-2 text-center text-sm font-medium text-gray-600 hover:text-gray-900">
                             Annuler
                         </a>
                         <button type="submit"
-                                class="inline-flex items-center px-4 py-2 bg-alerte border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-alerte-dark focus:outline-none focus:ring-2 focus:ring-alerte focus:ring-offset-2 transition">
-                            Soumettre la déclaration
+                                x-bind:disabled="submitting"
+                                class="inline-flex min-h-10 min-w-56 items-center justify-center gap-2 rounded-md border border-transparent bg-alerte px-4 py-2 text-xs font-semibold uppercase text-white transition hover:bg-alerte-dark focus:outline-none focus:ring-2 focus:ring-alerte focus:ring-offset-2 disabled:cursor-wait disabled:opacity-75">
+                            <x-icon name="refresh-cw" class="h-4 w-4 animate-spin" x-show="submitting" x-cloak aria-hidden="true" />
+                            <span x-show="!submitting">Soumettre la déclaration</span>
+                            <span x-show="submitting" x-cloak>Envoi en cours…</span>
                         </button>
                     </div>
+                    <p x-show="submitting" x-cloak role="status" aria-live="polite" class="text-right text-sm text-gray-600">
+                        Envoi des fichiers et enregistrement du dossier. Gardez cette page ouverte.
+                    </p>
                 </form>
             </div>
         </div>

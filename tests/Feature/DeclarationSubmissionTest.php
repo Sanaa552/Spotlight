@@ -56,6 +56,43 @@ class DeclarationSubmissionTest extends TestCase
         Storage::disk('public')->assertMissing(Declaration::firstOrFail()->photo_path);
     }
 
+    public function test_json_submission_returns_validation_errors_without_creating_a_declaration(): void
+    {
+        $citizen = User::factory()->create();
+
+        $this->actingAs($citizen)->withHeaders(['Accept' => 'application/json', 'X-Requested-With' => 'XMLHttpRequest'])
+            ->post(route('declarations.store'), [
+            'type' => 'perte',
+            'categorie' => 'objet',
+            'type_perte' => 'Portefeuille perdu',
+            'description' => 'Portefeuille perdu au centre-ville.',
+            'adresse' => 'Akwa, Douala',
+            'photo_publique' => UploadedFile::fake()->create('portefeuille.jpg', 1024, 'image/jpeg'),
+        ])->assertUnprocessable()->assertJsonPath('errors.declaration_perte.0',
+            'La preuve de signalement aux autorités est obligatoire pour soumettre une perte.');
+
+        $this->assertDatabaseCount('declarations', 0);
+    }
+
+    public function test_json_submission_returns_a_destination_after_success(): void
+    {
+        Storage::fake('local');
+        $citizen = User::factory()->create();
+
+        $this->actingAs($citizen)->withHeaders(['Accept' => 'application/json', 'X-Requested-With' => 'XMLHttpRequest'])
+            ->post(route('declarations.store'), [
+            'type' => 'perte',
+            'categorie' => 'objet',
+            'type_perte' => 'Portefeuille perdu',
+            'description' => 'Portefeuille perdu au centre-ville.',
+            'adresse' => 'Akwa, Douala',
+            'photo_publique' => UploadedFile::fake()->create('portefeuille.jpg', 1024, 'image/jpeg'),
+            'declaration_perte' => UploadedFile::fake()->create('signalement.pdf', 512, 'application/pdf'),
+        ])->assertCreated()->assertJsonPath('redirect', route('declarations.index'));
+
+        $this->assertDatabaseCount('declarations', 1);
+    }
+
     public function test_png_public_photo_is_saved_as_a_nonempty_private_jpeg(): void
     {
         if (! extension_loaded('gd')) {
