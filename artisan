@@ -9,6 +9,16 @@ define('LARAVEL_START', microtime(true));
 // Register the Composer autoloader...
 require __DIR__.'/vendor/autoload.php';
 
+// The PHP server spawned by "artisan serve" does not inherit CLI -d options.
+if (PHP_OS_FAMILY === 'Windows' && ($argv[1] ?? null) === 'serve') {
+    $scanDirectories = array_filter([getenv('PHP_INI_SCAN_DIR') ?: null, __DIR__.'/php-conf']);
+    $scanDirectory = implode(PATH_SEPARATOR, $scanDirectories);
+
+    putenv('PHP_INI_SCAN_DIR='.$scanDirectory);
+    $_ENV['PHP_INI_SCAN_DIR'] = $scanDirectory;
+    \Illuminate\Foundation\Console\ServeCommand::$passthroughVariables[] = 'PHP_INI_SCAN_DIR';
+}
+
 // Bootstrap Laravel and handle the command...
 /** @var Application $app */
 $app = require_once __DIR__.'/bootstrap/app.php';

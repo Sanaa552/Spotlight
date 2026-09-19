@@ -25,6 +25,7 @@ class User extends Authenticatable implements MustVerifyEmailContract
         'password',
         'role',
         'is_blocked',
+        'new_declaration_email',
     ];
 
     protected $hidden = [
@@ -39,6 +40,7 @@ class User extends Authenticatable implements MustVerifyEmailContract
             'password' => 'hashed',
             'role' => Role::class,
             'is_blocked' => 'boolean',
+            'new_declaration_email' => 'boolean',
         ];
     }
 

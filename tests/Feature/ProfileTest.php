@@ -61,6 +61,21 @@ class ProfileTest extends TestCase
         $this->assertNotNull($user->refresh()->email_verified_at);
     }
 
+    public function test_citizen_can_add_phone_and_disable_new_declaration_emails(): void
+    {
+        $user = User::factory()->create(['facebook_id' => 'facebook-profile']);
+
+        $this->actingAs($user)->patch('/profile', [
+            'name' => $user->name,
+            'email' => $user->email,
+            'telephone' => '+237 690 000 000',
+            'new_declaration_email' => '0',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame('+237 690 000 000', $user->refresh()->telephone);
+        $this->assertFalse($user->new_declaration_email);
+    }
+
     public function test_user_can_delete_their_account(): void
     {
         $user = User::factory()->create();

@@ -38,6 +38,89 @@ class MetaPublishingService
         return $this->postToGraph('facebook', $edge, $this->pageId, $payload);
     }
 
+    public function facebookPhotoUrl(string $photoId): array
+    {
+        if ($missing = $this->missingConfig(['page_access_token'])) {
+            return $this->configurationError('facebook', $missing);
+        }
+
+        $endpoint = sprintf(
+            'https://graph.facebook.com/%s/%s',
+            trim($this->graphVersion ?: 'v26.0', '/'),
+            $photoId
+        );
+
+        try {
+            $response = Http::withOptions(['verify' => config('services.meta.ca_bundle') ?: true])
+                ->withToken($this->pageAccessToken)
+                ->timeout(20)
+                ->get($endpoint, ['fields' => 'images']);
+            $url = $response->json('images.0.source');
+
+            return [
+                'success' => $response->successful() && is_string($url) && $this->isPublicHttpsUrl($url),
+                'channel' => 'facebook',
+                'status' => $response->status(),
+                'url' => $url,
+                'response' => $response->successful() ? null : $response->json(),
+            ];
+        } catch (Throwable $exception) {
+            Log::error('Lecture photo Facebook Spotlight impossible', [
+                'photo_id' => $photoId,
+                'exception' => $exception::class,
+                'message' => $exception->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'channel' => 'facebook',
+                'error' => $exception->getMessage(),
+            ];
+        }
+    }
+
+    public function publicPostUrl(string $channel, string $postId): ?string
+    {
+        if (! in_array($channel, ['facebook', 'instagram'], true) || blank($this->pageAccessToken)) {
+            return null;
+        }
+
+        $endpoint = sprintf(
+            'https://graph.facebook.com/%s/%s',
+            trim($this->graphVersion ?: 'v26.0', '/'),
+            $postId
+        );
+        $field = $channel === 'facebook' ? 'link' : 'permalink';
+
+        try {
+            $response = Http::withOptions(['verify' => config('services.meta.ca_bundle') ?: true])
+                ->withToken($this->pageAccessToken)
+                ->timeout(15)
+                ->get($endpoint, ['fields' => $field]);
+            $url = $response->json($field);
+
+            if ($response->successful() && is_string($url) && $this->isPublicHttpsUrl($url)) {
+                return $url;
+            }
+
+            Log::warning('Lien publication Meta indisponible Spotlight', [
+                'channel' => $channel,
+                'post_id' => $postId,
+                'status' => $response->status(),
+                'code' => $response->json('error.code'),
+            ]);
+        } catch (Throwable $exception) {
+            Log::warning('Lecture lien publication Meta impossible Spotlight', [
+                'channel' => $channel,
+                'post_id' => $postId,
+                'exception' => $exception::class,
+                'message' => $exception->getMessage(),
+            ]);
+        }
+
+        return null;
+    }
+
     public function publishToInstagram(string $imageUrl, string $caption): array
     {
         if ($missing = $this->missingConfig(['instagram_id', 'page_access_token'])) {
@@ -66,12 +149,69 @@ class MetaPublishingService
             ];
         }
 
+        $containerId = $container['response']['id'];
+        $status = $this->waitForInstagramContainer($containerId);
+        if (! $status['success']) {
+            return [
+                ...$status,
+                'step' => 'wait_container',
+                'container_id' => $containerId,
+            ];
+        }
+
         return [
             ...$this->postToGraph('instagram', 'media_publish', $this->instagramId, [
-                'creation_id' => $container['response']['id'],
+                'creation_id' => $containerId,
             ]),
             'step' => 'publish_container',
-            'container_id' => $container['response']['id'],
+            'container_id' => $containerId,
+        ];
+    }
+
+    private function waitForInstagramContainer(string $containerId): array
+    {
+        $endpoint = sprintf(
+            'https://graph.facebook.com/%s/%s',
+            trim($this->graphVersion ?: 'v26.0', '/'),
+            $containerId
+        );
+
+        for ($attempt = 0; $attempt < 10; $attempt++) {
+            if ($attempt > 0) {
+                sleep(2);
+            }
+
+            try {
+                $response = Http::withOptions(['verify' => config('services.meta.ca_bundle') ?: true])
+                    ->withToken($this->pageAccessToken)
+                    ->timeout(15)
+                    ->get($endpoint, ['fields' => 'status_code,status']);
+            } catch (Throwable $exception) {
+                return [
+                    'success' => false,
+                    'channel' => 'instagram',
+                    'error' => $exception->getMessage(),
+                ];
+            }
+
+            $state = $response->json('status_code');
+            if (! $response->successful() || in_array($state, ['ERROR', 'EXPIRED'], true)) {
+                return [
+                    'success' => false,
+                    'channel' => 'instagram',
+                    'status' => $response->status(),
+                    'response' => $response->json(),
+                ];
+            }
+            if ($state === 'FINISHED') {
+                return ['success' => true, 'channel' => 'instagram'];
+            }
+        }
+
+        return [
+            'success' => false,
+            'channel' => 'instagram',
+            'error' => 'Le média Instagram n\'est pas prêt après 20 secondes.',
         ];
     }
 
@@ -86,8 +226,8 @@ class MetaPublishingService
 
         try {
             $response = Http::asForm()
+                ->withOptions(['verify' => config('services.meta.ca_bundle') ?: true])
                 ->timeout(20)
-                ->retry(2, 500)
                 ->post($endpoint, [
                     ...$payload,
                     'access_token' => $this->pageAccessToken,

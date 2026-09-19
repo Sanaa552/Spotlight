@@ -13,7 +13,7 @@ class PublicDeclarationController extends Controller
     {
         $onglet = $request->query('onglet', 'pertes');
 
-        $query = Declaration::query()->with('localisation');
+        $query = Declaration::publique()->with('localisation');
 
         $declarations = match ($onglet) {
             'decouvertes' => $query->where('type', 'decouverte')->where('statut', 'validee'),
@@ -27,5 +27,18 @@ class PublicDeclarationController extends Controller
             'declarations' => $declarations,
             'onglet' => $onglet,
         ]);
+    }
+
+    public function show(Declaration $declaration): View
+    {
+        abort_unless(
+            Declaration::publique()->whereKey($declaration->id)
+                ->whereIn('statut', ['validee', 'cloturee'])->exists(),
+            404
+        );
+
+        $declaration->load('commentaires.auteur');
+
+        return view('public.declarations.show', compact('declaration'));
     }
 }

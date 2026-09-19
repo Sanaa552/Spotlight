@@ -17,23 +17,7 @@
         </div>
     @endif
 
-    @if (auth()->user()->isCitoyen())
-        <form method="POST" action="{{ route('verification.address.update') }}" class="border-t border-gray-200 pt-4">
-            @csrf
-            @method('PATCH')
-
-            <x-input-label for="email" value="Adresse e-mail à vérifier" />
-            <x-text-input id="email" name="email" type="email" required autocomplete="email"
-                          class="mt-1 block w-full" :value="old('email', auth()->user()->email)" />
-            <x-input-error :messages="$errors->get('email')" class="mt-2" />
-            <p class="mt-2 text-xs leading-5 text-gray-500">
-                Une erreur dans l’adresse ? Corrigez-la ici sans recréer votre compte.
-            </p>
-            <x-primary-button class="mt-3">Corriger et renvoyer</x-primary-button>
-        </form>
-    @else
-        <x-input-error :messages="$errors->get('email')" class="mb-4" />
-    @endif
+    <x-input-error :messages="$errors->get('email')" class="mb-4" />
 
     <div class="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 pt-4">
         <form method="POST" action="{{ route('verification.send') }}">
@@ -54,4 +38,23 @@
             </button>
         </form>
     </div>
+
+    @if (auth()->user()->isCitoyen())
+        <details class="mt-4 border-t border-gray-200 pt-4" @if ($errors->emailCorrection->any()) open @endif>
+            <summary class="cursor-pointer text-sm text-gray-600 hover:text-gray-900">
+                Adresse e-mail incorrecte ? <span class="font-medium underline">La modifier</span>
+            </summary>
+
+            <form method="POST" action="{{ route('verification.address.update') }}" class="mt-4">
+                @csrf
+                @method('PATCH')
+
+                <x-input-label for="email" value="Nouvelle adresse e-mail" />
+                <x-text-input id="email" name="email" type="email" required autocomplete="email"
+                              class="mt-1 block w-full" :value="old('email', auth()->user()->email)" />
+                <x-input-error :messages="$errors->emailCorrection->get('email')" class="mt-2" />
+                <x-primary-button class="mt-3">Enregistrer et renvoyer le lien</x-primary-button>
+            </form>
+        </details>
+    @endif
 </x-guest-layout>

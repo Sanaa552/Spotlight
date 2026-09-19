@@ -35,15 +35,26 @@
                 <div class="grid gap-4">
                     @foreach ($declarations as $declaration)
                         <a href="{{ route('declarations.show', $declaration) }}"
-                           class="block bg-white shadow-sm border border-gray-100 rounded-xl p-6 hover:shadow-md transition border-l-4 {{ $declaration->type === 'perte' ? 'border-l-alerte' : 'border-l-sonar' }}">
-                            <div class="flex justify-between items-start gap-4">
-                                <div class="flex-1">
-                                    <div class="flex items-center gap-2 mb-2">
+                           class="block bg-white shadow-sm border border-gray-100 rounded-md p-4 sm:p-5 hover:shadow-md transition border-l-4 {{ $declaration->type === 'perte' ? 'border-l-alerte' : 'border-l-sonar' }}">
+                            <div class="flex items-start gap-3 sm:gap-4">
+                                @if ($declaration->photoUrl())
+                                    <img src="{{ $declaration->photoUrl() }}"
+                                         alt="Photo de {{ $declaration->type_perte ?? $declaration->type_decouverte ?? $declaration->categorie }}"
+                                         loading="lazy"
+                                         class="w-20 h-20 sm:w-28 sm:h-28 shrink-0 rounded-md object-cover bg-gray-100">
+                                @endif
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex flex-wrap items-center gap-2 mb-2">
                                         <x-type-badge :type="$declaration->type" />
                                         <x-status-badge :statut="$declaration->statut" />
                                         <span class="text-xs text-gray-400">#{{ $declaration->id }}</span>
                                     </div>
-                                    <h3 class="font-semibold text-gray-900">{{ $declaration->categorie }}</h3>
+                                    @if (in_array($declaration->publication_status, ['queued', 'processing'], true))
+                                        <p class="text-xs font-medium text-azur">Publication en cours de traitement</p>
+                                    @elseif ($declaration->publication_status === 'failed')
+                                        <p class="text-xs font-medium text-laiton">Publication non aboutie ; l'équipe de modération peut la relancer.</p>
+                                    @endif
+                                    <h3 class="font-semibold text-gray-900 break-words">{{ $declaration->type_perte ?? $declaration->type_decouverte ?? ucfirst($declaration->categorie) }}</h3>
                                     <p class="text-sm text-gray-600 mt-1 line-clamp-2">{{ $declaration->description }}</p>
                                     @if ($declaration->localisation)
                                         <p class="text-xs text-gray-400 mt-2 flex items-center gap-1.5">
@@ -51,10 +62,8 @@
                                             {{ $declaration->localisation->adresse }}
                                         </p>
                                     @endif
+                                    <span class="block text-xs text-gray-400 mt-2">{{ $declaration->created_at->diffForHumans() }}</span>
                                 </div>
-                                <span class="text-xs text-gray-400 whitespace-nowrap">
-                                    {{ $declaration->created_at->diffForHumans() }}
-                                </span>
                             </div>
                         </a>
                     @endforeach

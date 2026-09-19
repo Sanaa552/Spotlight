@@ -27,6 +27,7 @@ class ProfileUpdateRequest extends FormRequest
                 Rule::unique(User::class)->ignore($this->user()->id),
             ],
             'telephone' => ['nullable', 'string', 'max:20'],
+            'new_declaration_email' => ['sometimes', 'boolean'],
             'photo' => ['nullable', 'image', 'max:8192'],
         ];
     }

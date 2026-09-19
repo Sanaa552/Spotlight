@@ -30,6 +30,11 @@ class PieceJointe extends Model
         return route('pieces-jointes.telecharger', $this);
     }
 
+    public function previewUrl(): string
+    {
+        return route('pieces-jointes.apercu', $this);
+    }
+
     public function estImage(): bool
     {
         return str_starts_with($this->type_mime ?? '', 'image/');

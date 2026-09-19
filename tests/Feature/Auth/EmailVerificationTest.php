@@ -22,7 +22,9 @@ class EmailVerificationTest extends TestCase
         $response = $this->actingAs($user)->get('/verify-email');
 
         $response->assertStatus(200);
-        $response->assertSee('Corriger et renvoyer');
+        $response->assertSee('Adresse e-mail incorrecte ?');
+        $response->assertSee('Enregistrer et renvoyer le lien');
+        $response->assertDontSee('open >', false);
     }
 
     public function test_unverified_citizen_can_correct_email_without_registering_again(): void
@@ -59,11 +61,24 @@ class EmailVerificationTest extends TestCase
         foreach (['pas-un-email', 'prise@example.com', 'actuelle@example.com'] as $email) {
             $this->actingAs($user)
                 ->patch(route('verification.address.update'), ['email' => $email])
-                ->assertSessionHasErrors('email');
+                ->assertSessionHasErrorsIn('emailCorrection', 'email');
         }
 
         $this->assertSame('actuelle@example.com', $user->fresh()->email);
         Notification::assertNothingSent();
+    }
+
+    public function test_email_correction_form_reopens_when_its_validation_fails(): void
+    {
+        $user = User::factory()->unverified()->create();
+
+        $this->actingAs($user)
+            ->from(route('verification.notice'))
+            ->followingRedirects()
+            ->patch(route('verification.address.update'), ['email' => 'pas-un-email'])
+            ->assertOk()
+            ->assertSee('open >', false)
+            ->assertSee('pas-un-email');
     }
 
     public function test_internal_or_already_verified_account_cannot_use_email_correction(): void

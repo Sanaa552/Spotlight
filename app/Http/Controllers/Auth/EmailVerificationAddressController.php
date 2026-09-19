@@ -22,7 +22,7 @@ class EmailVerificationAddressController extends Controller
 
         $request->merge(['email' => Str::lower(trim((string) $request->input('email')))]);
 
-        $validated = $request->validate([
+        $validated = $request->validateWithBag('emailCorrection', [
             'email' => [
                 'required',
                 'string',
@@ -34,7 +34,7 @@ class EmailVerificationAddressController extends Controller
         ]);
 
         if ($validated['email'] === $user->email) {
-            return back()->withErrors(['email' => 'Saisissez une adresse différente de l’adresse actuelle.']);
+            return back()->withErrors(['email' => 'Saisissez une adresse différente de l’adresse actuelle.'], 'emailCorrection');
         }
 
         Password::broker()->deleteToken($user);

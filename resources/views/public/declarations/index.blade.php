@@ -49,7 +49,7 @@
         @else
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 @foreach ($declarations as $declaration)
-                    <div class="bg-white/5 border border-white/10 rounded-lg overflow-hidden">
+                    <a href="{{ route('public.declarations.show', $declaration) }}" class="block bg-white/5 border border-white/10 rounded-lg overflow-hidden hover:border-white/30 transition">
                         @if ($declaration->photoUrl())
                             <img src="{{ $declaration->photoUrl() }}"
                                  alt="{{ $declaration->categorie }}"
@@ -63,8 +63,8 @@
                         <div class="p-4">
                             <div class="flex items-center gap-2 mb-2">
                                 <x-status-badge :statut="$declaration->statut" />
-                                @if ($declaration->localisation)
-                                    <span class="text-xs text-argent/40"> {{ $declaration->localisation->adresse }}</span>
+                                @if ($declaration->lieu)
+                                    <span class="text-xs text-argent/40"> {{ $declaration->lieu }}</span>
                                 @endif
                             </div>
                             <h3 class="text-argent font-semibold text-sm mb-1">
@@ -73,7 +73,7 @@
                             <p class="text-xs text-argent/50 line-clamp-3">{{ $declaration->description }}</p>
                             <p class="text-xs text-argent/30 mt-2">{{ $declaration->created_at->diffForHumans() }}</p>
                         </div>
-                    </div>
+                    </a>
                 @endforeach
             </div>
 
