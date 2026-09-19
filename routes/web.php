@@ -66,6 +66,8 @@ Route::middleware(['auth', 'verified', 'not_blocked', 'role:citoyen'])->group(fu
         ->name('rapprochements.confirmer');
     Route::get('/commissariats', [CommissariatController::class, 'rechercher'])
         ->middleware('throttle:6,1')->name('commissariats.rechercher');
+    Route::get('/commissariats/adresse', [CommissariatController::class, 'adresse'])
+        ->middleware('throttle:12,1')->name('commissariats.adresse');
     Route::get('/declarations', [DeclarationController::class, 'index'])->name('declarations.index');
     Route::get('/declarations/creer', [DeclarationController::class, 'create'])->name('declarations.create');
     Route::post('/declarations', [DeclarationController::class, 'store'])->name('declarations.store');

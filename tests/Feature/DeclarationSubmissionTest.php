@@ -10,6 +10,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\RateLimiter;
 use Tests\TestCase;
 
 class DeclarationSubmissionTest extends TestCase
@@ -466,6 +468,45 @@ class DeclarationSubmissionTest extends TestCase
 
         $this->actingAs($citizen)->get(route('commissariats.rechercher', ['ville' => 'Rue privée 12']))
             ->assertSessionHasErrors('ville');
+    }
+
+    public function test_citizen_can_get_a_station_neighbourhood_without_exposing_arbitrary_coordinates(): void
+    {
+        $citizen = User::factory()->create();
+        Cache::forget('osm:ville:'.sha1('Douala'));
+        Cache::forget('osm:postes:v2:'.sha1('4.05,9.7'));
+        Cache::forget('osm:adresse-poste:'.sha1('node/4537782550'));
+        RateLimiter::clear('osm:nominatim:spotlight');
+        Http::preventStrayRequests();
+        Http::fake(function ($request) {
+            if (str_contains($request->url(), '/reverse')) {
+                return Http::response(['address' => [
+                    'suburb' => 'Bonanjo', 'road' => 'Rue French (N°1.082)', 'city' => 'Douala I',
+                ]]);
+            }
+
+            if (str_contains($request->url(), '/search')) {
+                return Http::response([['lat' => '4.05', 'lon' => '9.70']]);
+            }
+
+            return Http::response(['elements' => [[
+                'type' => 'node', 'id' => 4537782550,
+                'lat' => 4.0406646, 'lon' => 9.6847372,
+                'tags' => ['name' => 'Groupement Mobile d’Intervention N°2'],
+            ]]]);
+        });
+
+        $url = route('commissariats.adresse', ['ville' => 'Douala', 'osm_id' => 'node/4537782550']);
+        $this->get($url)->assertRedirect(route('login'));
+        $this->actingAs($citizen)->get(route('commissariats.rechercher', ['ville' => 'Douala', 'format' => 'json']))
+            ->assertOk()->assertJsonPath('postes.0.osm_id', 'node/4537782550');
+        RateLimiter::clear('osm:nominatim:spotlight');
+        $this->get($url)->assertOk()->assertJsonPath('quartier', 'Bonanjo')
+            ->assertJsonPath('rue', 'Rue French (N°1.082)');
+        $this->get($url)->assertOk()->assertJsonPath('quartier', 'Bonanjo');
+        $this->get(route('commissariats.adresse', ['ville' => 'Douala', 'osm_id' => 'node/999']))
+            ->assertNotFound();
+        Http::assertSentCount(3);
     }
 
     public function test_discovery_map_never_geocodes_the_private_address_or_person_location(): void

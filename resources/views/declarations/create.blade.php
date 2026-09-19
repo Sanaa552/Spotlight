@@ -258,9 +258,9 @@
                     </select>
                 </div>
                 <button type="button" x-on:click="search()" x-bind:disabled="loading" class="rounded-md bg-azur px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Rechercher</button>
-                <button type="button" x-on:click="locate()" x-bind:disabled="!stations.length" class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 disabled:opacity-50">Utiliser ma position</button>
+                <button type="button" x-on:click="locate()" x-bind:disabled="loading" class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 disabled:opacity-50">Autoriser ma position</button>
             </div>
-            <p class="mt-2 text-xs text-gray-500">Votre position sert uniquement au tri sur cet appareil. Elle n’est pas envoyée à Spotlight ou à OpenStreetMap.</p>
+            <p class="mt-2 text-xs text-gray-500">Le navigateur vous demandera l’autorisation après ce clic. Votre position sert uniquement au tri sur cet appareil ; elle n’est pas envoyée à Spotlight ou à OpenStreetMap. Le quartier du poste est recherché lorsque vous le choisissez.</p>
             <p x-show="message" x-text="message" role="status" aria-live="polite" class="mt-3 text-sm text-gray-700"></p>
             <div class="mt-4 max-h-72 divide-y divide-gray-200 overflow-y-auto border-y border-gray-200">
                 <template x-for="(station, index) in stations" :key="`${station.lat}-${station.lng}-${index}`">
@@ -271,7 +271,7 @@
                             <p class="text-xs text-gray-500" x-text="station.distanceLabel || `${station.distance} km du centre-ville (à vol d’oiseau)`"></p>
                         </div>
                         <button type="button" x-on:click="preview = station" class="text-xs font-medium text-azur underline">Voir sur carte</button>
-                        <button type="button" x-on:click="choose(station)" class="rounded-md bg-sonar px-3 py-2 text-xs font-semibold text-white">Choisir ce poste</button>
+                        <button type="button" x-on:click="choose(station)" x-bind:disabled="choosing" class="rounded-md bg-sonar px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">Choisir ce poste</button>
                     </div>
                 </template>
             </div>
@@ -321,7 +321,7 @@
     </x-modal>
     <script>
         window.stationPicker = () => ({
-            city: '', stations: [], preview: null, loading: false, message: '',
+            city: '', stations: [], preview: null, loading: false, choosing: false, message: '', location: null,
             async search() {
                 if (!this.city) { this.message = 'Choisissez une ville pour afficher les postes.'; return; }
                 this.loading = true;
@@ -335,7 +335,10 @@
                     if (!response.ok) throw new Error('La recherche a échoué. Réessayez.');
                     const data = await response.json();
                     this.stations = data.postes || [];
-                    this.message = data.erreur || (this.stations.length ? `${this.stations.length} postes référencés. Leurs distances sont approximatives.` : 'Aucun poste référencé dans cette ville. Contactez directement les autorités.');
+                    if (this.location) this.sortStations();
+                    this.message = data.erreur || (this.stations.length
+                        ? `${this.stations.length} postes référencés${this.location ? ', triés depuis votre position' : ''}. Distances à vol d’oiseau.`
+                        : 'Aucun poste référencé dans cette ville. Contactez directement les autorités.');
                 } catch (error) {
                     this.stations = [];
                     this.message = error.message || 'Recherche indisponible. Contactez directement les autorités.';
@@ -348,30 +351,64 @@
                 }
                 this.message = 'Recherche de votre position…';
                 navigator.geolocation.getCurrentPosition(position => {
-                    const lat = position.coords.latitude * Math.PI / 180;
-                    const lng = position.coords.longitude * Math.PI / 180;
-                    this.stations = this.stations.map(station => {
-                        const stationLat = Number(station.lat) * Math.PI / 180;
-                        const stationLng = Number(station.lng) * Math.PI / 180;
-                        const value = Math.sin((stationLat - lat) / 2) ** 2 + Math.cos(lat) * Math.cos(stationLat) * Math.sin((stationLng - lng) / 2) ** 2;
-                        const distance = 12742 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
-                        return { ...station, distanceFromUser: distance, distanceLabel: `${distance.toFixed(2)} km de votre position (à vol d’oiseau)` };
-                    }).sort((a, b) => a.distanceFromUser - b.distanceFromUser);
-                    this.message = 'Postes triés par proximité. Votre position est restée dans le navigateur.';
+                    this.location = { lat: position.coords.latitude, lng: position.coords.longitude };
+                    if (this.stations.length) {
+                        this.sortStations();
+                        this.message = 'Position autorisée. Postes triés par proximité ; votre position reste dans le navigateur.';
+                    } else {
+                        this.message = 'Position autorisée. Choisissez maintenant une ville et recherchez les postes.';
+                    }
                 }, error => {
                     this.message = error.code === 1
-                        ? 'Accès à la position refusé. Autorisez la localisation pour ce site dans le navigateur et dans les paramètres de votre appareil, puis réessayez.'
-                        : error.code === 3 ? 'La recherche de position a expiré. Utilisez la ville choisie.'
-                            : 'Position indisponible. Utilisez la ville choisie.';
+                        ? 'Accès refusé. Dans le navigateur, ouvrez les informations du site à gauche de l’adresse et autorisez « Position ». Vérifiez aussi la localisation dans les paramètres Windows, puis réessayez.'
+                        : error.code === 3 ? 'La recherche de position a expiré. Réessayez ou utilisez la recherche par ville.'
+                            : 'Position indisponible. Utilisez la recherche par ville.';
                 }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 30000 });
+            },
+            sortStations() {
+                const lat = this.location.lat * Math.PI / 180;
+                const lng = this.location.lng * Math.PI / 180;
+                this.stations = this.stations.map(station => {
+                    const stationLat = Number(station.lat) * Math.PI / 180;
+                    const stationLng = Number(station.lng) * Math.PI / 180;
+                    const value = Math.sin((stationLat - lat) / 2) ** 2 + Math.cos(lat) * Math.cos(stationLat) * Math.sin((stationLng - lng) / 2) ** 2;
+                    const distance = 12742 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
+                    return { ...station, distanceFromUser: distance, distanceLabel: `${distance.toFixed(2)} km de votre position (à vol d’oiseau)` };
+                }).sort((a, b) => a.distanceFromUser - b.distanceFromUser);
             },
             mapUrl(station) {
                 const lat = Number(station.lat), lng = Number(station.lng);
                 const box = [lng - 0.008, lat - 0.008, lng + 0.008, lat + 0.008].join(',');
                 return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(box)}&layer=mapnik&marker=${lat}%2C${lng}`;
             },
-            choose(station) {
-                window.dispatchEvent(new CustomEvent('station-picked', { detail: { ...station, ville: this.city } }));
+            async choose(station) {
+                if (this.choosing) return;
+                this.choosing = true;
+                this.message = 'Recherche du quartier de ce poste…';
+                let quartier = null;
+                let rue = null;
+                if (station.osm_id) {
+                    try {
+                        const url = new URL(@json(route('commissariats.adresse')));
+                        url.searchParams.set('ville', this.city);
+                        url.searchParams.set('osm_id', station.osm_id);
+                        let response = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+                        if (response.status === 503) {
+                            await new Promise(resolve => setTimeout(resolve, 1100));
+                            response = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+                        }
+                        if (!response.ok) throw new Error('Adresse indisponible');
+                        const data = await response.json();
+                        quartier = data.quartier;
+                        rue = data.rue;
+                    } catch (_) {
+                        this.message = 'Quartier non disponible. Vérifiez le poste sur la carte avant de vous déplacer.';
+                    }
+                }
+                const localisation = [quartier, rue, this.city].filter(Boolean).join(', ');
+                const adresse = quartier || rue ? localisation : `quartier non renseigné, ${station.adresse || this.city}`;
+                window.dispatchEvent(new CustomEvent('station-picked', { detail: { ...station, adresse, ville: this.city } }));
+                this.choosing = false;
                 window.dispatchEvent(new CustomEvent('close-modal', { detail: 'station-picker' }));
             },
         });

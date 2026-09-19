@@ -57,6 +57,57 @@ class CommissariatController extends Controller
         return $this->afficherCarte($ville, $declaration);
     }
 
+    public function adresse(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'ville' => ['required', 'string', Rule::in(self::VILLES)],
+            'osm_id' => ['required', 'string', 'regex:/^(node|way|relation)\/[0-9]+$/'],
+        ]);
+
+        $postes = $this->afficherCarte($data['ville'])->getData()['commissariats'];
+        $poste = collect($postes)->firstWhere('osm_id', $data['osm_id']);
+        abort_unless($poste, 404);
+
+        try {
+            $adresse = Cache::remember('osm:adresse-poste:'.sha1($data['osm_id']), now()->addDays(7), function () use ($poste) {
+                $result = RateLimiter::attempt('osm:nominatim:spotlight', 1, function () use ($poste) {
+                    return Http::withOptions(['verify' => config('services.openstreetmap.ca_bundle') ?: true])
+                        ->withHeaders(['User-Agent' => 'Spotlight-Cameroon/1.0'])
+                        ->timeout(8)
+                        ->get('https://nominatim.openstreetmap.org/reverse', [
+                            'lat' => $poste['lat'],
+                            'lon' => $poste['lng'],
+                            'format' => 'jsonv2',
+                            'addressdetails' => 1,
+                        ])->throw()->json('address', []);
+                }, 1);
+
+                if ($result === false) {
+                    throw new RuntimeException('Limite de recherche OpenStreetMap atteinte.');
+                }
+
+                return $result;
+            });
+
+            $quartier = collect(['neighbourhood', 'suburb', 'quarter', 'city_district'])
+                ->map(fn ($key) => $adresse[$key] ?? null)
+                ->first(fn ($value) => is_string($value) && trim($value) !== '' && $value !== $data['ville']);
+
+            return response()->json([
+                'quartier' => $quartier,
+                'rue' => $adresse['road'] ?? null,
+            ]);
+        } catch (Throwable $exception) {
+            Log::warning('Adresse de poste indisponible Spotlight', [
+                'osm_id' => $data['osm_id'],
+                'exception' => $exception::class,
+                'message' => $exception->getMessage(),
+            ]);
+
+            return response()->json(['message' => 'Adresse du poste momentanément indisponible.'], 503);
+        }
+    }
+
     private function afficherCarte(?string $ville, ?Declaration $declaration = null): View
     {
         $lat = null;
@@ -131,6 +182,7 @@ class CommissariatController extends Controller
                         ])));
 
                         return [
+                            'osm_id' => isset($element['type'], $element['id']) ? $element['type'].'/'.$element['id'] : null,
                             'nom' => $tags['name'] ?? 'Poste de police ou de gendarmerie',
                             'adresse' => $adresse,
                             'lat' => $posteLat,
