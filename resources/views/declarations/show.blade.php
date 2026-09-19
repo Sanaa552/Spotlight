@@ -219,7 +219,7 @@
                         </p>
                     @endif
 
-                    @if ($declaration->type === 'decouverte' && $declaration->categorie === 'objet')
+                    @if (auth()->user()->isCitoyen() && $declaration->type === 'decouverte' && $declaration->categorie === 'objet')
                         <a href="{{ route('declarations.commissariats', $declaration) }}"
                            class="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-azur text-white text-xs font-semibold uppercase tracking-widest rounded-lg hover:bg-azur-dark transition">
                             <x-icon name="car" class="w-4 h-4" />
@@ -290,6 +290,61 @@
                         @endforeach
                     </div>
                 </div>
+            @endif
+
+            @if (! auth()->user()->isCitoyen() && $declaration->statut === 'en_attente')
+                @php
+                    $preuveRequiseManquante = $declaration->type === 'perte'
+                        ? ! $declarationPerte
+                        : (! $preuveSignalement || ($declaration->categorie === 'objet' && ! $preuveDecouverte));
+                    $publicationEnCours = in_array($declaration->publication_status, ['queued', 'processing'], true);
+                @endphp
+                <section class="bg-white border border-gray-200 rounded-md p-5 sm:p-6">
+                    <h4 class="text-base font-semibold text-gray-900">Décision de modération</h4>
+                    @if ($preuveRequiseManquante)
+                        <p class="mt-2 text-sm text-alerte-dark">Un justificatif obligatoire manque. Demandez au citoyen de compléter le dossier avant toute validation.</p>
+                    @elseif ($publicationEnCours)
+                        <p class="mt-2 text-sm text-azur">La publication est en cours. Attendez son résultat avant toute autre action.</p>
+                    @else
+                        @if ($declaration->type === 'decouverte' && $declaration->categorie === 'objet')
+                            <p class="mt-2 text-sm text-gray-600">Contrôlez la vidéo privée et le justificatif des autorités. Ne publiez pas si le document ne permet pas de confirmer la remise effective de l’objet à un poste identifié.</p>
+                        @elseif ($declaration->type === 'decouverte')
+                            <p class="mt-2 text-sm text-gray-600">Contrôlez le justificatif de signalement aux autorités. Ce dossier restera strictement privé.</p>
+                        @else
+                            <p class="mt-2 text-sm text-gray-600">Contrôlez la preuve de signalement de perte avant de lancer la publication.</p>
+                        @endif
+
+                        <form method="POST" action="{{ route('moderation.valider', $declaration) }}"
+                              x-data="{ submitting: false }" x-on:submit="submitting = true" class="mt-4 space-y-4">
+                            @csrf
+                            <label class="flex items-start gap-3 text-sm text-gray-800">
+                                <input type="checkbox" name="preuves_verifiees" value="1" required
+                                       class="mt-0.5 rounded border-gray-300 text-sonar focus:ring-sonar">
+                                <span>
+                                    @if ($declaration->type === 'decouverte' && $declaration->categorie === 'objet')
+                                        J’ai examiné la vidéo et le justificatif des autorités ; celui-ci confirme que l’objet a été remis à un poste identifié.
+                                    @elseif ($declaration->type === 'decouverte')
+                                        J’ai examiné le justificatif de signalement aux autorités et je confirme le suivi privé de ce dossier.
+                                    @else
+                                        J’ai examiné la preuve de signalement de perte aux autorités.
+                                    @endif
+                                </span>
+                            </label>
+                            @error('preuves_verifiees')
+                                <p role="alert" class="text-sm text-alerte-dark">{{ $message }}</p>
+                            @enderror
+                            @if ($declaration->facebook_post_id && ! $declaration->instagram_post_id)
+                                <p class="text-xs text-gray-600">Facebook est déjà publié ; seule la publication Instagram sera reprise.</p>
+                            @endif
+                            <button type="submit" x-bind:disabled="submitting"
+                                    class="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-sonar px-4 py-2 text-xs font-semibold uppercase text-white hover:bg-sonar-dark disabled:cursor-wait disabled:opacity-60">
+                                <x-icon name="refresh-cw" class="h-4 w-4 animate-spin" x-show="submitting" x-cloak aria-hidden="true" />
+                                <span x-show="!submitting">{{ $declaration->type === 'decouverte' && $declaration->categorie === 'personne' ? 'Confirmer en privé' : ($declaration->facebook_post_id ? 'Reprendre Instagram' : 'Valider et publier') }}</span>
+                                <span x-show="submitting" x-cloak>Traitement en cours…</span>
+                            </button>
+                        </form>
+                    @endif
+                </section>
             @endif
 
             {{-- Suivi / historique --}}

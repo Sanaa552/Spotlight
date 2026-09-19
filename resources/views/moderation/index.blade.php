@@ -68,24 +68,11 @@
                         </div>
 
                         <div class="mt-4 pt-4 border-t flex flex-wrap gap-3">
-                            <button type="button" x-show="status !== 'failed'"
-                                    x-bind:disabled="status === 'queued' || status === 'processing'"
-                                    x-on:click="$dispatch('open-modal', 'validate-declaration-{{ $declaration->id }}')"
-                                    class="inline-flex items-center gap-2 px-4 py-2 bg-sonar border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-sonar-dark disabled:opacity-50 disabled:cursor-not-allowed transition">
-                                <x-icon name="check-circle" class="h-4 w-4" />
-                                <span>Valider</span>
-                            </button>
-                            <form method="POST" action="{{ route('moderation.valider', $declaration) }}"
-                                  x-show="status === 'failed'" x-cloak x-data="{ submitting: false }"
-                                  x-on:submit="submitting = true">
-                                @csrf
-                                <button type="submit" x-bind:disabled="submitting"
-                                        class="inline-flex items-center gap-2 px-4 py-2 bg-sonar border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-sonar-dark disabled:opacity-50 disabled:cursor-wait transition">
-                                    <span x-show="submitting" class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" aria-hidden="true"></span>
-                                    <x-icon name="refresh-cw" class="h-4 w-4" x-show="!submitting" />
-                                    {{ $declaration->facebook_post_id ? 'Reprendre Instagram' : 'Réessayer la publication' }}
-                                </button>
-                            </form>
+                            <a href="{{ route('moderation.declarations.show', $declaration) }}"
+                               class="inline-flex items-center gap-2 rounded-md bg-sonar px-4 py-2 text-xs font-semibold uppercase text-white transition hover:bg-sonar-dark">
+                                <x-icon name="search" class="h-4 w-4" />
+                                {{ $declaration->publication_status === 'failed' ? 'Examiner et relancer' : 'Examiner les preuves' }}
+                            </a>
 
                             <button type="button"
                                     x-bind:disabled="status === 'queued' || status === 'processing'"
@@ -95,38 +82,7 @@
                                 Rejeter
                             </button>
 
-                            <a href="{{ route('moderation.declarations.show', $declaration) }}"
-                               class="inline-flex items-center px-4 py-2 text-xs font-semibold text-gray-500 hover:text-gray-800 uppercase tracking-widest">
-                                Voir le détail
-                            </a>
                         </div>
-
-                        <x-modal name="validate-declaration-{{ $declaration->id }}" maxWidth="md" focusable>
-                            <form method="POST" action="{{ route('moderation.valider', $declaration) }}"
-                                  x-data="{ submitting: false }" x-on:submit="submitting = true" class="p-6">
-                                @csrf
-                                <h2 class="text-lg font-semibold text-gray-900">Valider cette déclaration ?</h2>
-                                <p class="mt-2 text-sm leading-6 text-gray-600">
-                                    @if ($declaration->type === 'decouverte' && $declaration->categorie === 'personne')
-                                        Le signalement <strong>#{{ $declaration->id }}</strong> sera vérifié en interne. Il ne sera publié ni sur Spotlight ni sur les réseaux sociaux. Vérifiez la preuve de signalement aux autorités.
-                                    @else
-                                        La déclaration <strong>#{{ $declaration->id }}</strong> sera rendue publique seulement après vérification des preuves privées et confirmation des publications Facebook et Instagram.
-                                    @endif
-                                    @if ($declaration->facebook_post_id)
-                                        Facebook est déjà publié et ne sera pas republié.
-                                    @endif
-                                </p>
-                                <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                                    <x-secondary-button x-on:click="$dispatch('close')">Annuler</x-secondary-button>
-                                    <button type="submit" x-bind:disabled="submitting"
-                                            class="inline-flex items-center justify-center gap-2 rounded-md bg-sonar px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white hover:bg-sonar-dark disabled:opacity-60 disabled:cursor-wait">
-                                        <span x-show="submitting" class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" aria-hidden="true"></span>
-                                        <span x-show="!submitting">{{ $declaration->type === 'decouverte' && $declaration->categorie === 'personne' ? 'Confirmer en privé' : 'Valider et publier' }}</span>
-                                        <span x-show="submitting">Envoi en cours…</span>
-                                    </button>
-                                </div>
-                            </form>
-                        </x-modal>
 
                         <x-modal name="reject-declaration-{{ $declaration->id }}" maxWidth="md" focusable>
                             <form method="POST" action="{{ route('moderation.rejeter', $declaration) }}" class="p-6">

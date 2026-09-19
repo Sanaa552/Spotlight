@@ -43,7 +43,7 @@ class ModerationPublicationTest extends TestCase
             ->andReturnUsing(fn ($channel) => "https://example.test/{$channel}-post");
         $this->app->instance(MetaPublishingService::class, $meta);
 
-        $this->actingAs($moderator)->post(route('moderation.valider', $declaration))
+        $this->actingAs($moderator)->post(route('moderation.valider', $declaration), ['preuves_verifiees' => '1'])
             ->assertSessionHas('success');
         Notification::assertNotSentTo($admin, ModerationConfirmed::class);
         Notification::assertNotSentTo($subscriber, NewPublicDeclaration::class);
@@ -102,7 +102,7 @@ class ModerationPublicationTest extends TestCase
         $this->app->instance(MetaPublishingService::class, $meta);
 
         $this->actingAs($moderator)
-            ->post(route('moderation.valider', $declaration))
+            ->post(route('moderation.valider', $declaration), ['preuves_verifiees' => '1'])
             ->assertSessionHas('success');
 
         $this->assertDatabaseHas('declarations', [
@@ -148,7 +148,7 @@ class ModerationPublicationTest extends TestCase
             ->andReturnUsing(fn ($channel) => "https://example.test/{$channel}-post");
         $this->app->instance(MetaPublishingService::class, $meta);
 
-        $this->actingAs($moderator)->post(route('moderation.valider', $declaration))
+        $this->actingAs($moderator)->post(route('moderation.valider', $declaration), ['preuves_verifiees' => '1'])
             ->assertSessionHas('success');
 
         $this->runPublication($declaration, $moderator);
@@ -180,7 +180,7 @@ class ModerationPublicationTest extends TestCase
         $this->app->instance(MetaPublishingService::class, $meta);
 
         $this->actingAs($moderator)
-            ->post(route('moderation.valider', $declaration))
+            ->post(route('moderation.valider', $declaration), ['preuves_verifiees' => '1'])
             ->assertSessionHas('success');
         $this->runPublication($declaration, $moderator);
 
@@ -194,7 +194,7 @@ class ModerationPublicationTest extends TestCase
         $this->assertDatabaseCount('app_notifications', 0);
 
         $this->actingAs($moderator)
-            ->post(route('moderation.valider', $declaration))
+            ->post(route('moderation.valider', $declaration), ['preuves_verifiees' => '1'])
             ->assertSessionHas('success');
         $this->runPublication($declaration, $moderator);
 
@@ -222,7 +222,7 @@ class ModerationPublicationTest extends TestCase
         $meta->shouldNotReceive('publishToInstagram');
         $this->app->instance(MetaPublishingService::class, $meta);
 
-        $this->actingAs($moderator)->post(route('moderation.valider', $declaration))
+        $this->actingAs($moderator)->post(route('moderation.valider', $declaration), ['preuves_verifiees' => '1'])
             ->assertSessionHas('success');
         $this->runPublication($declaration, $moderator);
 
@@ -254,7 +254,7 @@ class ModerationPublicationTest extends TestCase
         $meta->shouldNotReceive('publishToInstagram');
         $this->app->instance(MetaPublishingService::class, $meta);
 
-        $this->actingAs($moderator)->post(route('moderation.valider', $declaration))
+        $this->actingAs($moderator)->post(route('moderation.valider', $declaration), ['preuves_verifiees' => '1'])
             ->assertSessionHas('success');
         $this->runPublication($declaration, $moderator);
 
@@ -341,7 +341,7 @@ class ModerationPublicationTest extends TestCase
         $this->app->instance(MetaPublishingService::class, $meta);
 
         $this->actingAs($moderator)
-            ->post(route('moderation.valider', $declaration))
+            ->post(route('moderation.valider', $declaration), ['preuves_verifiees' => '1'])
             ->assertSessionHas('warning');
 
         $this->assertDatabaseHas('declarations', ['id' => $declaration->id, 'statut' => 'en_attente']);
@@ -361,7 +361,7 @@ class ModerationPublicationTest extends TestCase
         $meta->shouldNotReceive('publishToInstagram');
         $this->app->instance(MetaPublishingService::class, $meta);
 
-        $this->actingAs($moderator)->post(route('moderation.valider', $declaration))
+        $this->actingAs($moderator)->post(route('moderation.valider', $declaration), ['preuves_verifiees' => '1'])
             ->assertSessionHas('warning');
         $this->assertSame('en_attente', $declaration->fresh()->statut);
     }
@@ -390,6 +390,10 @@ class ModerationPublicationTest extends TestCase
         $this->app->instance(MetaPublishingService::class, $meta);
 
         $this->actingAs($moderator)->post(route('moderation.valider', $declaration))
+            ->assertSessionHasErrors('preuves_verifiees');
+        $this->assertSame('en_attente', $declaration->fresh()->statut);
+
+        $this->actingAs($moderator)->post(route('moderation.valider', $declaration), ['preuves_verifiees' => '1'])
             ->assertSessionHas('success');
         $this->assertDatabaseHas('declarations', [
             'id' => $declaration->id, 'statut' => 'validee',
@@ -432,7 +436,7 @@ class ModerationPublicationTest extends TestCase
             ->andReturnUsing(fn ($channel) => "https://example.test/{$channel}-post");
         $this->app->instance(MetaPublishingService::class, $meta);
 
-        $this->actingAs($moderator)->post(route('moderation.valider', $declaration))
+        $this->actingAs($moderator)->post(route('moderation.valider', $declaration), ['preuves_verifiees' => '1'])
             ->assertSessionHas('warning');
         $this->assertSame('en_attente', $declaration->fresh()->statut);
 
@@ -442,11 +446,48 @@ class ModerationPublicationTest extends TestCase
             'chemin' => 'declarations-privees/recepisse.pdf', 'nom_original' => 'recepisse.pdf',
         ]);
 
-        $this->actingAs($moderator)->post(route('moderation.valider', $declaration))
+        $this->actingAs($moderator)->post(route('moderation.valider', $declaration), ['preuves_verifiees' => '1'])
             ->assertSessionHas('success');
         $this->runPublication($declaration, $moderator);
         $this->assertSame('validee', $declaration->fresh()->statut);
         $this->get(route('dashboard'))->assertSee('Objet trouvé sous contrôle.');
+    }
+
+    public function test_found_object_cannot_be_published_without_explicit_moderator_review(): void
+    {
+        Storage::fake('public');
+        Storage::fake('local');
+        $citizen = User::factory()->create();
+        $moderator = User::factory()->create(['role' => 'moderateur']);
+        $declaration = $citizen->declarations()->create([
+            'type' => 'decouverte', 'categorie' => 'objet',
+            'description' => 'Objet remis aux autorités.',
+            'photo_path' => 'photos-publiques/objet.jpg',
+            'statut' => 'en_attente',
+        ]);
+        Storage::disk('public')->put($declaration->photo_path, 'photo');
+
+        foreach (['preuve_decouverte' => 'lieu.mp4', 'preuve_signalement' => 'recepisse.pdf'] as $type => $filename) {
+            $path = 'declarations-privees/'.$filename;
+            Storage::disk('local')->put($path, 'private-proof');
+            $declaration->piecesJointes()->create([
+                'type_document' => $type, 'disque' => 'local',
+                'chemin' => $path, 'nom_original' => $filename,
+            ]);
+        }
+
+        $this->actingAs($moderator)->get(route('moderation.index'))
+            ->assertOk()->assertSee('Examiner les preuves')
+            ->assertDontSee('action="'.route('moderation.valider', $declaration).'"', false);
+        $this->get(route('moderation.declarations.show', $declaration))
+            ->assertOk()->assertSee('name="preuves_verifiees"', false)
+            ->assertSee('J’ai examiné la vidéo');
+
+        $this->post(route('moderation.valider', $declaration))
+            ->assertSessionHasErrors('preuves_verifiees');
+        $this->assertSame('en_attente', $declaration->fresh()->statut);
+        $this->assertNull($declaration->publication_status);
+        $this->assertDatabaseCount('jobs', 0);
     }
 
     public function test_legacy_validated_case_without_meta_ids_is_not_public(): void
@@ -499,7 +540,7 @@ class ModerationPublicationTest extends TestCase
         $this->app->instance(MetaPublishingService::class, $meta);
 
         $this->actingAs($moderator)
-            ->post(route('moderation.valider', $declaration))
+            ->post(route('moderation.valider', $declaration), ['preuves_verifiees' => '1'])
             ->assertSessionHas('success');
         $this->runPublication($declaration, $moderator);
 
@@ -520,9 +561,9 @@ class ModerationPublicationTest extends TestCase
         $declaration = $this->declaration($citizen, 'photos-publiques/photo.jpg');
         Storage::disk('public')->put($declaration->photo_path, 'public-photo');
 
-        $this->actingAs($moderator)->post(route('moderation.valider', $declaration))
+        $this->actingAs($moderator)->post(route('moderation.valider', $declaration), ['preuves_verifiees' => '1'])
             ->assertSessionHas('success');
-        $this->actingAs($moderator)->post(route('moderation.valider', $declaration))
+        $this->actingAs($moderator)->post(route('moderation.valider', $declaration), ['preuves_verifiees' => '1'])
             ->assertSessionHas('warning');
         $this->actingAs($moderator)->post(route('moderation.rejeter', $declaration), [
             'motif_rejet' => 'Refus pendant la publication',

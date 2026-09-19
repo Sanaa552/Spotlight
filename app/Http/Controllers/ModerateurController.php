@@ -32,6 +32,12 @@ class ModerateurController extends Controller
     /** Valider une déclaration */
     public function valider(Request $request, Declaration $declaration): RedirectResponse
     {
+        $request->validate([
+            'preuves_verifiees' => ['accepted'],
+        ], [
+            'preuves_verifiees.accepted' => 'Examinez les preuves du dossier et confirmez leur contrôle avant de valider.',
+        ]);
+
         $startedAt = microtime(true);
         $moderateur = $request->user();
         Log::info('Validation declaration demandee Spotlight', [
@@ -85,6 +91,12 @@ class ModerateurController extends Controller
                     return back()->with('warning', 'Une preuve enregistrée est introuvable. Aucune publication n’a été lancée ; contactez l’administrateur.');
                 }
             }
+
+            Log::info('Controle des preuves atteste par la moderation Spotlight', [
+                'declaration_id' => $declaration->id,
+                'moderateur_id' => $moderateur->id,
+                'documents_requis' => $requiredDocuments,
+            ]);
 
             if ($declaration->type === 'decouverte' && $declaration->categorie === 'personne') {
                 $declaration->confirmerSignalement();
