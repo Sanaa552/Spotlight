@@ -207,6 +207,11 @@
                     @if ($declaration->localisation->poste_prevu)
                         <p class="mt-2 text-sm text-gray-700"><span class="font-medium">Poste envisagé :</span> {{ $declaration->localisation->poste_prevu }}</p>
                         <p class="mt-1 text-xs text-gray-500">Ce choix ne confirme pas la remise de l’objet. Le justificatif des autorités reste obligatoire.</p>
+                        @if ($declaration->localisation->poste_latitude !== null && $declaration->localisation->poste_longitude !== null)
+                            <a href="https://www.openstreetmap.org/?mlat={{ $declaration->localisation->poste_latitude }}&mlon={{ $declaration->localisation->poste_longitude }}#map=16/{{ $declaration->localisation->poste_latitude }}/{{ $declaration->localisation->poste_longitude }}"
+                               target="_blank" rel="noopener noreferrer" class="mt-2 inline-block text-sm font-medium text-azur underline">Voir l’emplacement indiqué du poste</a>
+                            <p class="mt-1 text-xs text-gray-500">Coordonnées du poste indiquées par le déclarant : {{ $declaration->localisation->poste_latitude }}, {{ $declaration->localisation->poste_longitude }}. Vérifiez-les avant déplacement.</p>
+                        @endif
                     @endif
                     @if ($declaration->localisation->latitude && $declaration->localisation->longitude)
                         <p class="text-xs text-gray-400 mt-1">

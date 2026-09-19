@@ -320,6 +320,8 @@ class DeclarationSubmissionTest extends TestCase
             'description' => 'Clés trouvées au marché.',
             'adresse' => 'Douala',
             'poste_prevu' => 'Poste de test (Douala)',
+            'poste_latitude' => 4.06,
+            'poste_longitude' => 9.71,
             'photo_publique' => UploadedFile::fake()->create('cles.jpg', 1024, 'image/jpeg'),
         ];
 
@@ -334,6 +336,8 @@ class DeclarationSubmissionTest extends TestCase
         $declaration = Declaration::firstOrFail();
         $this->assertSame('en_attente', $declaration->statut);
         $this->assertSame('Poste de test (Douala)', $declaration->localisation->poste_prevu);
+        $this->assertEquals(4.06, $declaration->localisation->poste_latitude);
+        $this->assertEquals(9.71, $declaration->localisation->poste_longitude);
         $this->actingAs($citizen)->get(route('declarations.show', $declaration))
             ->assertSee('Ajouter la preuve de remise ou de signalement')
             ->assertSee('Poste de test (Douala)');
@@ -389,7 +393,7 @@ class DeclarationSubmissionTest extends TestCase
             ->assertOk()
             ->assertSee('value="Poste de test (Douala)"', false)
             ->assertSee("type: 'decouverte'", false)
-            ->assertSee('Le choix d’un poste ne remplace pas le récépissé');
+            ->assertSee('Son choix ne remplace pas le récépissé des autorités');
 
         $this->actingAs($citizen)->get(route('declarations.create'))
             ->assertOk()
@@ -453,6 +457,9 @@ class DeclarationSubmissionTest extends TestCase
 
         $this->actingAs($citizen)->get(route('commissariats.rechercher', ['ville' => 'Douala']))
             ->assertOk()->assertSee('Poste de test')->assertSee('1.57 km')->assertSee('Choisir ce poste');
+        $this->actingAs($citizen)->get(route('commissariats.rechercher', ['ville' => 'Douala', 'format' => 'json']))
+            ->assertOk()->assertJsonPath('postes.0.nom', 'Poste de test')
+            ->assertJsonPath('postes.0.lat', 4.06);
         Http::assertSent(fn ($request) => str_contains($request->url(), 'nominatim.openstreetmap.org')
             && str_contains(urldecode($request->url()), 'Douala, Cameroun'));
         Http::assertSent(fn ($request) => str_contains($request->url(), 'overpass-api.de'));

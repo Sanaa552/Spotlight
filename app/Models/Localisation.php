@@ -13,6 +13,8 @@ class Localisation extends Model
         'latitude',
         'longitude',
         'poste_prevu',
+        'poste_latitude',
+        'poste_longitude',
     ];
 
     public function declaration(): BelongsTo

@@ -48,6 +48,7 @@ class DeclarationController extends Controller
         return view('declarations.create', [
             'posteInitial' => $posteInitial,
             'perteInitiale' => $perteInitiale,
+            'villes' => CommissariatController::VILLES,
             'defaultType' => ($posteInitial || $perteInitiale) ? 'decouverte' : 'perte',
             'defaultCategory' => ($posteInitial || $perteInitiale) ? 'objet' : '',
         ]);
@@ -99,9 +100,11 @@ class DeclarationController extends Controller
             'type_decouverte' => ['nullable', 'string', 'max:255', 'required_if:type,decouverte'],
             'adresse' => ['required', 'string', 'max:255'],
             'poste_prevu' => [
-                'nullable', 'string', 'max:255',
+                'nullable', 'string', 'max:255', 'required_with:poste_latitude,poste_longitude',
                 Rule::prohibitedIf(fn () => ! ($request->input('type') === 'decouverte' && $request->input('categorie') === 'objet')),
             ],
+            'poste_latitude' => ['nullable', 'numeric', 'between:-90,90', 'required_with:poste_longitude', Rule::prohibitedIf(fn () => ! ($request->input('type') === 'decouverte' && $request->input('categorie') === 'objet'))],
+            'poste_longitude' => ['nullable', 'numeric', 'between:-180,180', 'required_with:poste_latitude', Rule::prohibitedIf(fn () => ! ($request->input('type') === 'decouverte' && $request->input('categorie') === 'objet'))],
             'perte_id' => [
                 'nullable', 'integer',
                 Rule::prohibitedIf(fn () => ! ($request->input('type') === 'decouverte' && $request->input('categorie') === 'objet')),
@@ -150,6 +153,7 @@ class DeclarationController extends Controller
             'photo_publique.prohibited' => 'Ne joignez pas de photo publique pour une personne découverte.',
             'perte_id.integer' => 'Choisissez une annonce de perte valide.',
             'perte_id.prohibited' => 'Une correspondance ne peut être proposée que pour une découverte d’objet.',
+            'poste_prevu.required_with' => 'Indiquez le nom du poste sélectionné ou retirez ses coordonnées.',
         ], [
             'pieces_jointes' => 'pièces jointes',
             'pieces_jointes.*' => 'pièce jointe',
@@ -194,7 +198,7 @@ class DeclarationController extends Controller
         try {
             $declaration = DB::transaction(function () use ($request, $validated, $declarationPerte, $photoPublique, $preuveDecouverte, $preuveSignalement, &$storedPaths) {
                 $declaration = $request->user()->declarations()->create([
-                    ...collect($validated)->except(['adresse', 'latitude', 'longitude', 'poste_prevu', 'perte_id', 'pieces_jointes', 'declaration_perte', 'photo_publique', 'preuve_decouverte', 'preuve_signalement'])->toArray(),
+                    ...collect($validated)->except(['adresse', 'latitude', 'longitude', 'poste_prevu', 'poste_latitude', 'poste_longitude', 'perte_id', 'pieces_jointes', 'declaration_perte', 'photo_publique', 'preuve_decouverte', 'preuve_signalement'])->toArray(),
                     'statut' => 'en_attente',
                 ]);
 
@@ -204,6 +208,8 @@ class DeclarationController extends Controller
                     'latitude' => $validated['latitude'] ?? null,
                     'longitude' => $validated['longitude'] ?? null,
                     'poste_prevu' => $validated['poste_prevu'] ?? null,
+                    'poste_latitude' => $validated['poste_latitude'] ?? null,
+                    'poste_longitude' => $validated['poste_longitude'] ?? null,
                 ]);
 
                 if ($photoPublique) {

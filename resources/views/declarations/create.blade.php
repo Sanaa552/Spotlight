@@ -91,25 +91,28 @@
                     <div x-show="type === 'decouverte'" x-cloak class="border-l-4 border-sonar bg-sonar/5 px-4 py-3 text-sm text-gray-700">
                         <span x-show="categorie === 'personne'">Si une personne, notamment un enfant, est en danger, contactez immédiatement la <a href="tel:117" class="font-semibold underline">Police au 117</a> ou la <a href="tel:113" class="font-semibold underline">Gendarmerie au 113</a>. Ne la filmez pas et ne publiez pas sa position. Ce dossier restera privé.</span>
                         <span x-show="categorie !== 'personne'">Filmez l’objet et le lieu si cela ne présente aucun danger, puis remettez l’objet à un poste de police ou de gendarmerie. Vous pourrez ajouter le récépissé après avoir enregistré ce dossier privé.</span>
-                        <a x-show="categorie === 'objet'" href="{{ route('commissariats.rechercher') }}" target="_blank" rel="noopener noreferrer"
-                           class="mt-2 inline-flex items-center gap-2 font-semibold text-azur hover:underline">
-                            <x-icon name="location" class="h-4 w-4" /> Trouver un poste à proximité
-                        </a>
+                        <button x-show="categorie === 'objet'" type="button" x-on:click="$dispatch('open-modal', 'station-picker')"
+                                class="mt-2 inline-flex items-center gap-2 font-semibold text-azur hover:underline">
+                            <x-icon name="location" class="h-4 w-4" /> Choisir un poste où remettre l’objet
+                        </button>
                     </div>
 
                     <div x-show="type === 'decouverte' && categorie === 'objet'" x-cloak>
-                        <x-input-label for="poste_prevu" value="Poste envisagé (facultatif)" />
+                        <x-input-label for="poste_prevu" value="Poste où vous prévoyez de remettre l’objet (facultatif)" />
                         <x-text-input id="poste_prevu" name="poste_prevu" type="text" class="mt-1 block w-full"
                                       :value="old('poste_prevu', $posteInitial)" maxlength="255"
                                       x-bind:disabled="type !== 'decouverte' || categorie !== 'objet'" />
-                        <p id="poste-selection-status" role="status" aria-live="polite" class="mt-1 text-xs text-gray-500">Le choix d’un poste ne remplace pas le récépissé de remise ou de signalement.</p>
+                        <input id="poste_latitude" name="poste_latitude" type="hidden" value="{{ old('poste_latitude') }}" x-bind:disabled="type !== 'decouverte' || categorie !== 'objet'">
+                        <input id="poste_longitude" name="poste_longitude" type="hidden" value="{{ old('poste_longitude') }}" x-bind:disabled="type !== 'decouverte' || categorie !== 'objet'">
+                        <p id="poste-selection-status" role="status" aria-live="polite" class="mt-1 text-xs text-gray-500">Ce poste est distinct du lieu de découverte. Son choix ne remplace pas le récépissé des autorités.</p>
                         <x-input-error :messages="$errors->get('poste_prevu')" class="mt-2" />
                     </div>
 
                     <div x-show="type === 'decouverte' && categorie === 'objet'" x-cloak class="border-t border-gray-100 pt-5">
-                        <label for="perte_id" class="block text-sm font-medium text-gray-700">Cet objet figure-t-il déjà parmi les pertes ?</label>
+                        <label for="perte_id" class="block text-sm font-medium text-gray-700">L’objet a-t-il déjà été déclaré perdu sur Spotlight ?</label>
                         <input id="perte_id" name="perte_id" type="hidden" value="{{ old('perte_id', $perteInitiale?->id) }}"
                                x-bind:disabled="type !== 'decouverte' || categorie !== 'objet'">
+                        <p id="selected-loss-empty" class="mt-2 text-sm text-gray-500 {{ $perteInitiale ? 'hidden' : '' }}">Aucune annonce choisie. Vous pouvez continuer et déclarer cet objet même s’il n’est pas sur Spotlight.</p>
                         <div id="selected-loss" class="mt-3 {{ $perteInitiale ? '' : 'hidden' }} flex items-center gap-3 rounded-md border border-gray-200 p-3">
                             <img id="selected-loss-photo" src="{{ $perteInitiale?->photoUrl() }}" alt="Photo de la perte sélectionnée" class="h-16 w-16 shrink-0 rounded-md object-cover bg-gray-100">
                             <div class="min-w-0 flex-1">
@@ -119,17 +122,17 @@
                             </div>
                             <button id="clear-loss" type="button" title="Retirer la correspondance" class="shrink-0 text-lg text-gray-500 hover:text-gray-900" aria-label="Retirer la correspondance">&times;</button>
                         </div>
-                        <a href="{{ route('rapprochements.pertes') }}" target="_blank" rel="noopener noreferrer"
-                           class="mt-3 inline-block text-sm font-semibold text-azur hover:underline">Chercher parmi les pertes d’objets</a>
-                        <p class="mt-1 text-xs text-gray-500">Si aucune annonce ne correspond, laissez ce champ vide : votre découverte sera enregistrée normalement.</p>
+                        <button type="button" x-on:click="$dispatch('open-modal', 'loss-picker')"
+                                class="mt-3 text-sm font-semibold text-azur hover:underline">Voir les objets perdus et choisir une annonce</button>
+                        <p class="mt-1 text-xs text-gray-500">La correspondance sera proposée à la modération ; elle ne sera pas validée automatiquement.</p>
                         <x-input-error :messages="$errors->get('perte_id')" class="mt-2" />
                     </div>
 
                     {{-- Type perte (si perte) --}}
                     <div x-show="type === 'perte'" x-cloak>
-                        <x-input-label for="type_perte" value="Précision (ex: personne disparue, objet perdu...)" />
+                        <x-input-label for="type_perte" value="Quel objet ou quelle personne recherchez-vous ?" />
                         <x-text-input id="type_perte" name="type_perte" type="text" class="mt-1 block w-full"
-                                      :value="old('type_perte')" />
+                                      :value="old('type_perte')" placeholder="Ex. portefeuille noir, enfant disparu" />
                     </div>
 
                     <div x-show="type === 'perte'" x-cloak>
@@ -148,9 +151,9 @@
 
                     {{-- Type découverte (si découverte) --}}
                     <div x-show="type === 'decouverte'" x-cloak>
-                        <x-input-label for="type_decouverte" value="Précision (ex: personne trouvée, objet trouvé...)" />
+                        <x-input-label for="type_decouverte" value="Qu’avez-vous trouvé ou signalé ?" />
                         <x-text-input id="type_decouverte" name="type_decouverte" type="text" class="mt-1 block w-full"
-                                      :value="old('type_decouverte')" />
+                                      :value="old('type_decouverte')" placeholder="Ex. trousseau de clés, personne à protéger" />
                     </div>
 
                     <div x-show="type === 'decouverte' && categorie === 'objet'" x-cloak>
@@ -181,18 +184,18 @@
 
                     {{-- Lieu (résumé texte) --}}
                     <div>
-                        <x-input-label for="lieu" value="Lieu (résumé)" />
+                        <x-input-label for="lieu" value="Quartier et ville de la perte ou de la découverte" />
                         <x-text-input id="lieu" name="lieu" type="text" class="mt-1 block w-full" :value="old('lieu')" />
                         <p class="mt-1 text-xs text-gray-500">Quartier et ville uniquement : ce texte pourra être publié. Ne saisissez pas d'adresse privée.</p>
                     </div>
 
                     {{-- Localisation --}}
                     <fieldset class="border border-gray-200 rounded-lg p-4">
-                        <legend class="text-sm font-medium text-gray-700 px-2"> Localisation</legend>
+                        <legend class="text-sm font-medium text-gray-700 px-2"> Lieu de la perte ou de la découverte</legend>
 
                         <div class="space-y-4">
                             <div>
-                                <x-input-label for="adresse" value="Adresse" />
+                                <x-input-label for="adresse" value="Adresse ou repère du lieu de l’événement" />
                                 <x-text-input id="adresse" name="adresse" type="text" required
                                               class="mt-1 block w-full" :value="old('adresse')" />
                             </div>
@@ -237,36 +240,219 @@
             </div>
         </div>
     </div>
+    <x-modal name="station-picker" maxWidth="2xl" focusable>
+        <div x-data="stationPicker()" class="p-5 sm:p-6">
+            <div class="flex items-start justify-between gap-3">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900">Choisir un poste pour la remise</h2>
+                    <p class="mt-1 text-sm text-gray-600">Choisissez d’abord la ville. Le poste reste à confirmer avant déplacement.</p>
+                </div>
+                <button type="button" x-on:click="$dispatch('close')" aria-label="Fermer" class="text-xl text-gray-500 hover:text-gray-900">&times;</button>
+            </div>
+            <div class="mt-5 flex flex-wrap items-end gap-2">
+                <div class="min-w-0 flex-1">
+                    <label for="station-city" class="block text-sm font-medium text-gray-700">Ville</label>
+                    <select id="station-city" x-model="city" class="mt-1 w-full rounded-md border-gray-300 text-sm">
+                        <option value="">Choisir une ville</option>
+                        @foreach ($villes as $option)<option value="{{ $option }}">{{ $option }}</option>@endforeach
+                    </select>
+                </div>
+                <button type="button" x-on:click="search()" x-bind:disabled="loading" class="rounded-md bg-azur px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Rechercher</button>
+                <button type="button" x-on:click="locate()" x-bind:disabled="!stations.length" class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 disabled:opacity-50">Utiliser ma position</button>
+            </div>
+            <p class="mt-2 text-xs text-gray-500">Votre position sert uniquement au tri sur cet appareil. Elle n’est pas envoyée à Spotlight ou à OpenStreetMap.</p>
+            <p x-show="message" x-text="message" role="status" aria-live="polite" class="mt-3 text-sm text-gray-700"></p>
+            <div class="mt-4 max-h-72 divide-y divide-gray-200 overflow-y-auto border-y border-gray-200">
+                <template x-for="(station, index) in stations" :key="`${station.lat}-${station.lng}-${index}`">
+                    <div class="flex flex-wrap items-center gap-3 py-3">
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-semibold text-gray-900" x-text="station.nom"></p>
+                            <p class="text-xs text-gray-600" x-text="station.adresse || city"></p>
+                            <p class="text-xs text-gray-500" x-text="station.distanceLabel || `${station.distance} km du centre-ville (à vol d’oiseau)`"></p>
+                        </div>
+                        <button type="button" x-on:click="preview = station" class="text-xs font-medium text-azur underline">Voir sur carte</button>
+                        <button type="button" x-on:click="choose(station)" class="rounded-md bg-sonar px-3 py-2 text-xs font-semibold text-white">Choisir ce poste</button>
+                    </div>
+                </template>
+            </div>
+            <template x-if="preview">
+                <div class="mt-4">
+                    <p class="mb-2 text-sm font-medium text-gray-900" x-text="preview.nom"></p>
+                    <iframe title="Emplacement du poste choisi" x-bind:src="mapUrl(preview)" loading="lazy" class="h-48 w-full border border-gray-200"></iframe>
+                    <p class="mt-1 text-xs text-gray-500">Point référencé sur OpenStreetMap ; vérifiez l’adresse auprès du poste.</p>
+                </div>
+            </template>
+        </div>
+    </x-modal>
+
+    <x-modal name="loss-picker" maxWidth="2xl" focusable>
+        <div x-data="lossPicker()" x-on:open-modal.window="if ($event.detail === 'loss-picker') search(1)" class="p-5 sm:p-6">
+            <div class="flex items-start justify-between gap-3">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900">Objets déclarés perdus</h2>
+                    <p class="mt-1 text-sm text-gray-600">Comparez la photo et la description. Vous pouvez aussi déclarer sans correspondance.</p>
+                </div>
+                <button type="button" x-on:click="$dispatch('close')" aria-label="Fermer" class="text-xl text-gray-500 hover:text-gray-900">&times;</button>
+            </div>
+            <div class="mt-5 flex gap-2">
+                <label for="loss-search" class="sr-only">Chercher un objet</label>
+                <input id="loss-search" x-model="query" x-on:keydown.enter.prevent="search(1)" maxlength="80" placeholder="Objet, description ou quartier" class="min-w-0 flex-1 rounded-md border-gray-300 text-sm">
+                <button type="button" x-on:click="search(1)" class="rounded-md bg-azur px-4 py-2 text-sm font-semibold text-white">Chercher</button>
+            </div>
+            <p x-show="message" x-text="message" role="status" aria-live="polite" class="mt-3 text-sm text-gray-700"></p>
+            <div class="mt-4 max-h-96 divide-y divide-gray-200 overflow-y-auto border-y border-gray-200">
+                <template x-for="loss in losses" :key="loss.id">
+                    <div class="flex gap-3 py-3">
+                        <img x-bind:src="loss.photo" alt="Photo de l’objet perdu" class="h-20 w-20 shrink-0 rounded-md object-cover bg-gray-100">
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-semibold text-gray-900"><span x-text="loss.titre"></span> <span class="text-gray-500" x-text="`#${loss.id}`"></span></p>
+                            <p class="mt-1 text-xs text-gray-500" x-text="loss.lieu || 'Lieu non précisé'"></p>
+                            <p class="mt-1 line-clamp-2 text-xs text-gray-700" x-text="loss.description"></p>
+                            <button type="button" x-on:click="choose(loss)" class="mt-2 text-xs font-semibold text-sonar-dark underline">Choisir cette annonce</button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            <div class="mt-4 flex items-center justify-between gap-3">
+                <button type="button" x-on:click="clear()" class="text-sm font-medium text-gray-600 underline">Aucune annonce ne correspond</button>
+                <button x-show="page < lastPage" type="button" x-on:click="search(page + 1)" class="text-sm font-medium text-azur underline">Voir la suite</button>
+            </div>
+        </div>
+    </x-modal>
     <script>
+        window.stationPicker = () => ({
+            city: '', stations: [], preview: null, loading: false, message: '',
+            async search() {
+                if (!this.city) { this.message = 'Choisissez une ville pour afficher les postes.'; return; }
+                this.loading = true;
+                this.message = 'Recherche des postes…';
+                this.preview = null;
+                try {
+                    const url = new URL(@json(route('commissariats.rechercher')));
+                    url.searchParams.set('ville', this.city);
+                    url.searchParams.set('format', 'json');
+                    const response = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+                    if (!response.ok) throw new Error('La recherche a échoué. Réessayez.');
+                    const data = await response.json();
+                    this.stations = data.postes || [];
+                    this.message = data.erreur || (this.stations.length ? `${this.stations.length} postes référencés. Leurs distances sont approximatives.` : 'Aucun poste référencé dans cette ville. Contactez directement les autorités.');
+                } catch (error) {
+                    this.stations = [];
+                    this.message = error.message || 'Recherche indisponible. Contactez directement les autorités.';
+                } finally { this.loading = false; }
+            },
+            locate() {
+                if (!window.isSecureContext || !navigator.geolocation) {
+                    this.message = 'La position nécessite HTTPS et un navigateur compatible. La recherche par ville reste disponible.';
+                    return;
+                }
+                this.message = 'Recherche de votre position…';
+                navigator.geolocation.getCurrentPosition(position => {
+                    const lat = position.coords.latitude * Math.PI / 180;
+                    const lng = position.coords.longitude * Math.PI / 180;
+                    this.stations = this.stations.map(station => {
+                        const stationLat = Number(station.lat) * Math.PI / 180;
+                        const stationLng = Number(station.lng) * Math.PI / 180;
+                        const value = Math.sin((stationLat - lat) / 2) ** 2 + Math.cos(lat) * Math.cos(stationLat) * Math.sin((stationLng - lng) / 2) ** 2;
+                        const distance = 12742 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
+                        return { ...station, distanceFromUser: distance, distanceLabel: `${distance.toFixed(2)} km de votre position (à vol d’oiseau)` };
+                    }).sort((a, b) => a.distanceFromUser - b.distanceFromUser);
+                    this.message = 'Postes triés par proximité. Votre position est restée dans le navigateur.';
+                }, error => {
+                    this.message = error.code === 1
+                        ? 'Accès à la position refusé. Autorisez la localisation pour ce site dans le navigateur et dans les paramètres de votre appareil, puis réessayez.'
+                        : error.code === 3 ? 'La recherche de position a expiré. Utilisez la ville choisie.'
+                            : 'Position indisponible. Utilisez la ville choisie.';
+                }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 30000 });
+            },
+            mapUrl(station) {
+                const lat = Number(station.lat), lng = Number(station.lng);
+                const box = [lng - 0.008, lat - 0.008, lng + 0.008, lat + 0.008].join(',');
+                return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(box)}&layer=mapnik&marker=${lat}%2C${lng}`;
+            },
+            choose(station) {
+                window.dispatchEvent(new CustomEvent('station-picked', { detail: { ...station, ville: this.city } }));
+                window.dispatchEvent(new CustomEvent('close-modal', { detail: 'station-picker' }));
+            },
+        });
+        window.lossPicker = () => ({
+            query: '', losses: [], page: 1, lastPage: 1, message: '',
+            async search(page = 1) {
+                this.message = 'Recherche des annonces…';
+                try {
+                    const url = new URL(@json(route('rapprochements.pertes')));
+                    url.searchParams.set('format', 'json');
+                    url.searchParams.set('q', this.query);
+                    url.searchParams.set('page', page);
+                    const response = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+                    if (!response.ok) throw new Error('Recherche indisponible. Réessayez.');
+                    const data = await response.json();
+                    this.losses = data.pertes || [];
+                    this.page = data.page;
+                    this.lastPage = data.derniere_page;
+                    this.message = this.losses.length ? '' : 'Aucune annonce correspondante. Continuez sans sélectionner de perte.';
+                } catch (error) {
+                    this.losses = [];
+                    this.message = error.message || 'Recherche indisponible. Réessayez.';
+                }
+            },
+            choose(loss) {
+                window.dispatchEvent(new CustomEvent('loss-picked', { detail: loss }));
+                window.dispatchEvent(new CustomEvent('close-modal', { detail: 'loss-picker' }));
+            },
+            clear() {
+                window.dispatchEvent(new CustomEvent('loss-cleared'));
+                window.dispatchEvent(new CustomEvent('close-modal', { detail: 'loss-picker' }));
+            },
+        });
         const chosenLoss = document.getElementById('perte_id');
         const lossPreview = document.getElementById('selected-loss');
-        document.getElementById('clear-loss')?.addEventListener('click', () => {
+        function effacerPerte() {
             chosenLoss.value = '';
             lossPreview.classList.add('hidden');
-        });
+            document.getElementById('selected-loss-empty').classList.remove('hidden');
+        }
+        function appliquerPerte(selected) {
+            if (!selected || !Number.isSafeInteger(selected.id) || chosenLoss.disabled) return;
+            const url = new URL(selected.url, window.location.origin);
+            if (url.origin !== window.location.origin || !url.pathname.startsWith('/declarations-publiques/')) return;
+            chosenLoss.value = selected.id;
+            document.getElementById('selected-loss-photo').src = selected.photo;
+            const link = document.getElementById('selected-loss-link');
+            link.href = url.href;
+            link.textContent = `${selected.title || selected.titre} #${selected.id}`;
+            lossPreview.classList.remove('hidden');
+            document.getElementById('selected-loss-empty').classList.add('hidden');
+        }
+        document.getElementById('clear-loss')?.addEventListener('click', effacerPerte);
+        window.addEventListener('loss-cleared', effacerPerte);
+        window.addEventListener('loss-picked', event => appliquerPerte(event.detail));
         if ('BroadcastChannel' in window) {
             const lossChannel = new BroadcastChannel('spotlight-pertes');
             lossChannel.addEventListener('message', event => {
-                const selected = event.data;
-                if (selected?.type !== 'perte-choisie' || !Number.isSafeInteger(selected.id) || chosenLoss.disabled) return;
-                const url = new URL(selected.url, window.location.origin);
-                if (url.origin !== window.location.origin || !url.pathname.startsWith('/declarations-publiques/')) return;
-                chosenLoss.value = selected.id;
-                document.getElementById('selected-loss-photo').src = selected.photo;
-                const link = document.getElementById('selected-loss-link');
-                link.href = url.href;
-                link.textContent = `${selected.title} #${selected.id}`;
-                lossPreview.classList.remove('hidden');
+                if (event.data?.type === 'perte-choisie') appliquerPerte(event.data);
             });
         }
-        function appliquerPoste(nom) {
+        function appliquerPoste(nom, lat = null, lng = null) {
             if (typeof nom !== 'string') return;
             const input = document.getElementById('poste_prevu');
             if (!input || input.disabled) return;
             input.value = nom.slice(0, 255);
             input.dispatchEvent(new Event('input', { bubbles: true }));
-            document.getElementById('poste-selection-status').textContent = 'Poste sélectionné. Confirmez son adresse avant de vous déplacer ; le récépissé reste obligatoire.';
+            document.getElementById('poste_latitude').value = lat ?? '';
+            document.getElementById('poste_longitude').value = lng ?? '';
+            document.getElementById('poste-selection-status').textContent = `${nom} sélectionné. Le modérateur pourra voir son emplacement. Le récépissé reste obligatoire.`;
         }
+        document.getElementById('poste_prevu')?.addEventListener('input', event => {
+            if (!event.isTrusted) return;
+            document.getElementById('poste_latitude').value = '';
+            document.getElementById('poste_longitude').value = '';
+            document.getElementById('poste-selection-status').textContent = 'Poste saisi manuellement : son emplacement n’est pas vérifié. Le récépissé reste obligatoire.';
+        });
+        window.addEventListener('station-picked', event => {
+            const station = event.detail;
+            appliquerPoste(`${station.nom} (${station.adresse || station.ville})`, station.lat, station.lng);
+        });
         if ('BroadcastChannel' in window) {
             const stationChannel = new BroadcastChannel('spotlight-postes');
             stationChannel.addEventListener('message', event => {

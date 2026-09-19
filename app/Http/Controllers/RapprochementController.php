@@ -7,13 +7,14 @@ use App\Models\Rapprochement;
 use App\Services\RapprochementNotifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
 class RapprochementController extends Controller
 {
-    public function pertes(Request $request): View
+    public function pertes(Request $request): View|JsonResponse
     {
         $validated = $request->validate([
             'q' => ['nullable', 'string', 'max:80'],
@@ -35,8 +36,25 @@ class RapprochementController extends Controller
                 ->orWhere('lieu', 'like', '%'.$term.'%'));
         }
 
+        $pertes = $query->latest()->paginate(12)->withQueryString();
+
+        if ($request->query('format') === 'json') {
+            return response()->json([
+                'pertes' => $pertes->getCollection()->map(fn ($perte) => [
+                    'id' => $perte->id,
+                    'titre' => $perte->type_perte ?: 'Objet perdu',
+                    'description' => $perte->description,
+                    'lieu' => $perte->lieu,
+                    'photo' => $perte->photoUrl(),
+                    'url' => route('public.declarations.show', $perte),
+                ])->values(),
+                'page' => $pertes->currentPage(),
+                'derniere_page' => $pertes->lastPage(),
+            ]);
+        }
+
         return view('declarations.pertes-objets', [
-            'pertes' => $query->latest()->paginate(12)->withQueryString(),
+            'pertes' => $pertes,
             'decouverte' => $decouverte,
             'q' => $term ?? '',
         ]);

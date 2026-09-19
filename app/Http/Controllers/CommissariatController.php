@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Declaration;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -15,17 +16,31 @@ use Throwable;
 
 class CommissariatController extends Controller
 {
-    private const VILLES = [
+    public const VILLES = [
         'Bafoussam', 'Bamenda', 'Bertoua', 'Buea', 'Douala', 'Dschang',
         'Ebolowa', 'Garoua', 'Kribi', 'Kumba', 'Limbe', 'Maroua',
         'Ngaoundéré', 'Yaoundé',
     ];
 
-    public function rechercher(Request $request): View
+    public function rechercher(Request $request): View|JsonResponse
     {
         $ville = $request->validate(['ville' => ['nullable', 'string', Rule::in(self::VILLES)]])['ville'] ?? null;
 
-        return $this->afficherCarte($ville);
+        $vue = $this->afficherCarte($ville);
+
+        if ($request->query('format') === 'json') {
+            $donnees = $vue->getData();
+
+            return response()->json([
+                'ville' => $donnees['ville'],
+                'lat' => $donnees['lat'],
+                'lng' => $donnees['lng'],
+                'postes' => $donnees['commissariats'],
+                'erreur' => $donnees['erreurCarte'],
+            ]);
+        }
+
+        return $vue;
     }
 
     public function proches(Request $request, Declaration $declaration): View
@@ -98,7 +113,7 @@ class CommissariatController extends Controller
                             ->throw()->json('elements', []);
                     });
 
-                    $commissariats = collect($elements)->map(function ($element) use ($lat, $lng) {
+                    $commissariats = collect($elements)->map(function ($element) use ($lat, $lng, $ville) {
                         $posteLat = $element['lat'] ?? $element['center']['lat'] ?? null;
                         $posteLng = $element['lon'] ?? $element['center']['lon'] ?? null;
 
@@ -108,9 +123,16 @@ class CommissariatController extends Controller
 
                         $posteLat = (float) $posteLat;
                         $posteLng = (float) $posteLng;
+                        $tags = $element['tags'] ?? [];
+                        $adresse = trim(implode(', ', array_filter([
+                            $tags['addr:housenumber'] ?? null,
+                            $tags['addr:street'] ?? $tags['addr:full'] ?? null,
+                            $tags['addr:suburb'] ?? $tags['addr:city'] ?? $ville,
+                        ])));
 
                         return [
-                            'nom' => $element['tags']['name'] ?? 'Poste de police ou de gendarmerie',
+                            'nom' => $tags['name'] ?? 'Poste de police ou de gendarmerie',
+                            'adresse' => $adresse,
                             'lat' => $posteLat,
                             'lng' => $posteLng,
                             'distance' => round($this->distanceKm($lat, $lng, $posteLat, $posteLng), 2),
