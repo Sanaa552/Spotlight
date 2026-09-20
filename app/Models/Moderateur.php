@@ -26,10 +26,8 @@ class Moderateur extends User
 
     public function validerDeclaration(Declaration $declaration): Declaration
     {
-        $declaration->update([
-            'statut' => 'validee',
-            'moderateur_id' => $this->id,
-        ]);
+        $declaration->publier();
+        $declaration->update(['moderateur_id' => $this->id]);
 
         return $declaration;
     }

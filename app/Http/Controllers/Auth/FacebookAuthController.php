@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use GuzzleHttp\Client;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -31,7 +32,9 @@ class FacebookAuthController extends Controller
     public function callback(): RedirectResponse
     {
         try {
-            $facebookUser = Socialite::driver('facebook')->user();
+            $facebookUser = Socialite::driver('facebook')
+                ->setHttpClient(new Client(['verify' => config('services.meta.ca_bundle') ?: true]))
+                ->user();
         } catch (Throwable $exception) {
             Log::warning('Connexion Facebook echouee Spotlight', [
                 'exception' => $exception::class,
@@ -53,8 +56,9 @@ class FacebookAuthController extends Controller
                 ->withErrors(['email' => 'Facebook n’a pas fourni d’adresse email. Autorisez l’email ou utilisez l’inscription classique.']);
         }
 
+        $email = Str::lower(trim($facebookUser->getEmail()));
         $user = User::where('facebook_id', $facebookUser->getId())
-            ->orWhere('email', $facebookUser->getEmail())
+            ->orWhere('email', $email)
             ->first();
 
         if ($user) {
@@ -70,31 +74,37 @@ class FacebookAuthController extends Controller
                     ->withErrors(['email' => 'La connexion Facebook est réservée aux comptes citoyens.']);
             }
 
+            if (filled($user->facebook_id) && $user->facebook_id !== $facebookUser->getId()) {
+                Log::warning('Compte deja lie a un autre profil Facebook Spotlight', ['user_id' => $user->id]);
+
+                return redirect()->route('login')
+                    ->withErrors(['email' => 'Ce compte est déjà lié à un autre profil Facebook. Connectez-vous avec votre mot de passe ou contactez l’administrateur.']);
+            }
+
+            if ($user->is_blocked) {
+                Log::notice('Connexion Facebook refusee pour compte bloque Spotlight', ['user_id' => $user->id]);
+
+                return redirect()->route('login')
+                    ->withErrors(['email' => 'Votre compte a été bloqué.']);
+            }
+
             $user->forceFill([
                 'facebook_id' => $facebookUser->getId(),
                 'facebook_avatar_url' => $facebookUser->getAvatar(),
-                'email_verified_at' => $user->email_verified_at ?? now(),
+                'email_verified_at' => $user->email_verified_at
+                    ?? (Str::lower($user->email) === $email ? now() : null),
             ])->save();
         } else {
-            $user = User::create([
+            $user = new User([
                 'name' => $facebookUser->getName() ?: $facebookUser->getNickname() ?: 'Utilisateur Facebook',
-                'email' => $facebookUser->getEmail(),
+                'email' => $email,
                 'facebook_id' => $facebookUser->getId(),
                 'facebook_avatar_url' => $facebookUser->getAvatar(),
-                'email_verified_at' => now(),
                 'password' => Hash::make(Str::random(32)),
                 'role' => Role::Citoyen,
             ]);
-        }
-
-        if ($user->is_blocked) {
-            Log::notice('Connexion Facebook refusee pour compte bloque Spotlight', [
-                'user_id' => $user->id,
-            ]);
-
-            return redirect()
-                ->route('login')
-                ->withErrors(['email' => 'Votre compte a été bloqué.']);
+            $user->email_verified_at = now();
+            $user->save();
         }
 
         Auth::login($user, true);

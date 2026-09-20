@@ -24,14 +24,15 @@ class PieceJointe extends Model
         return $this->belongsTo(Declaration::class);
     }
 
-    /** URL publique du fichier (stocké sur le disque "public") */
+    /** Toute pièce jointe passe par une route autorisée. */
     public function url(): string
     {
-        if ($this->estDeclarationPerte()) {
-            return route('pieces-jointes.telecharger', $this);
-        }
+        return route('pieces-jointes.telecharger', $this);
+    }
 
-        return asset('storage/' . $this->chemin);
+    public function previewUrl(): string
+    {
+        return route('pieces-jointes.apercu', $this);
     }
 
     public function estImage(): bool

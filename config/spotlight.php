@@ -11,6 +11,7 @@ return [
     'uploads' => [
         'max_files' => 5,
         'max_file_kilobytes' => 10240,
+        'max_video_kilobytes' => 30720,
         'max_total_kilobytes' => 61440,
     ],
 ];

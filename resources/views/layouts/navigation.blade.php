@@ -31,18 +31,17 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
                                 </svg>
                             </a>
-                            <a href="{{ route('notifications.index') }}" title="Notifications"
-                               class="relative p-2.5 rounded-full transition {{ request()->routeIs('notifications.index') ? 'text-alerte bg-alerte/10' : 'text-argent/60 hover:text-argent hover:bg-white/5' }}">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2c0 .5-.2 1-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-                                </svg>
-                                @if ($notificationsNonLues > 0)
-                                    <span class="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-alerte text-white text-[10px] font-bold flex items-center justify-center">
-                                        {{ $notificationsNonLues > 9 ? '9+' : $notificationsNonLues }}
-                                    </span>
-                                @endif
-                            </a>
                         @endif
+
+                        <a href="{{ route('notifications.index') }}" title="Notifications"
+                           class="relative p-2.5 rounded-full transition {{ request()->routeIs('notifications.index') ? 'text-alerte bg-alerte/10' : 'text-argent/60 hover:text-argent hover:bg-white/5' }}">
+                            <x-icon name="bell" class="w-5 h-5" />
+                            @if ($notificationsNonLues > 0)
+                                <span class="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-alerte text-white text-[10px] font-bold flex items-center justify-center">
+                                    {{ $notificationsNonLues > 9 ? '9+' : $notificationsNonLues }}
+                                </span>
+                            @endif
+                        </a>
 
                         @if (auth()->user()->isModerateur() || auth()->user()->isAdministrateur())
                             <a href="{{ route('moderation.index') }}" title="Modération"
@@ -81,7 +80,7 @@
                 <x-dropdown align="right" width="48">
                                         <x-slot name="trigger">
                         <button class="flex items-center gap-2 text-sm font-medium text-argent/70 hover:text-argent focus:outline-none transition">
-                            @if (Auth::user()->photo_path)
+                            @if (Auth::user()->photoUrl())
                                 <img src="{{ Auth::user()->photoUrl() }}" alt="{{ Auth::user()->name }}" class="w-8 h-8 rounded-full object-cover">
                             @else
                                 <span class="w-8 h-8 rounded-full bg-azur/15 text-azur text-xs font-bold flex items-center justify-center">
@@ -150,10 +149,11 @@
                     <x-responsive-nav-link :href="route('declarations.index')" :active="request()->routeIs('declarations.index')">
                         {{ __('Mes déclarations') }}
                     </x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('notifications.index')" :active="request()->routeIs('notifications.*')">
-                        {{ __('Notifications') }}
-                    </x-responsive-nav-link>
                 @endif
+
+                <x-responsive-nav-link :href="route('notifications.index')" :active="request()->routeIs('notifications.*')">
+                    {{ __('Notifications') }} @if ($notificationsNonLues > 0)({{ $notificationsNonLues }})@endif
+                </x-responsive-nav-link>
 
                 @if (auth()->user()->isModerateur() || auth()->user()->isAdministrateur())
                     <x-responsive-nav-link :href="route('moderation.index')" :active="request()->routeIs('moderation.*')">
@@ -228,13 +228,21 @@
                     </a>
                 @elseif (auth()->user()->isModerateur())
                     <a href="{{ route('moderation.index') }}"
-                       class="relative col-span-3 flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-lg px-1 text-[11px] font-medium transition {{ request()->routeIs('moderation.*') ? 'text-white bg-alerte/15' : 'text-argent/60' }}">
+                       class="relative col-span-2 flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-lg px-1 text-[11px] font-medium transition {{ request()->routeIs('moderation.*') ? 'text-white bg-alerte/15' : 'text-argent/60' }}">
                         <x-icon name="shield-check" class="h-5 w-5" />
                         <span>Modération</span>
                         @if ($declarationsEnAttente > 0)
-                            <span class="absolute right-1/3 top-1 min-w-[16px] rounded-full bg-alerte px-1 text-center text-[10px] font-bold leading-4 text-white">
+                            <span class="absolute right-1/4 top-1 min-w-[16px] rounded-full bg-alerte px-1 text-center text-[10px] font-bold leading-4 text-white">
                                 {{ $declarationsEnAttente > 9 ? '9+' : $declarationsEnAttente }}
                             </span>
+                        @endif
+                    </a>
+                    <a href="{{ route('notifications.index') }}"
+                       class="relative flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-lg px-1 text-[11px] font-medium transition {{ request()->routeIs('notifications.*') ? 'text-white bg-alerte/15' : 'text-argent/60' }}">
+                        <x-icon name="bell" class="h-5 w-5" />
+                        <span>Alertes</span>
+                        @if ($notificationsNonLues > 0)
+                            <span class="absolute right-3 top-1 min-w-[16px] rounded-full bg-alerte px-1 text-center text-[10px] font-bold leading-4 text-white">{{ $notificationsNonLues > 9 ? '9+' : $notificationsNonLues }}</span>
                         @endif
                     </a>
                 @else
@@ -255,10 +263,13 @@
                         <span>Comptes</span>
                     </a>
 
-                    <a href="{{ route('admin.statistiques.index') }}"
-                       class="flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-lg px-1 text-[11px] font-medium transition {{ request()->routeIs('admin.statistiques.*') ? 'text-white bg-alerte/15' : 'text-argent/60' }}">
-                        <x-icon name="chart" class="h-5 w-5" />
-                        <span>Stats</span>
+                    <a href="{{ route('notifications.index') }}"
+                       class="relative flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-lg px-1 text-[11px] font-medium transition {{ request()->routeIs('notifications.*') ? 'text-white bg-alerte/15' : 'text-argent/60' }}">
+                        <x-icon name="bell" class="h-5 w-5" />
+                        <span>Alertes</span>
+                        @if ($notificationsNonLues > 0)
+                            <span class="absolute right-3 top-1 min-w-[16px] rounded-full bg-alerte px-1 text-center text-[10px] font-bold leading-4 text-white">{{ $notificationsNonLues > 9 ? '9+' : $notificationsNonLues }}</span>
+                        @endif
                     </a>
                 @endif
 

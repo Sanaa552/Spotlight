@@ -13,6 +13,11 @@
                     {{ session('success') }}
                 </div>
             @endif
+            @if ($errors->any())
+                <div class="mb-6 rounded-md border border-alerte/30 bg-alerte/10 px-4 py-3 text-sm text-alerte-dark" role="alert">
+                    {{ $errors->first() }}
+                </div>
+            @endif
 
             @if ($declarations->isEmpty())
                 <div class="bg-white shadow-sm border border-gray-100 rounded-xl p-10 text-center text-gray-500 flex flex-col items-center gap-2">
@@ -23,17 +28,17 @@
                 <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
                     @foreach ($declarations as $declaration)
                         @php
-                            $photos = $declaration->piecesPubliques->filter->estImage()->values();
-                            $documents = $declaration->piecesPubliques->reject->estImage()->values();
-                            $detailRoute = auth()->user()->isCitoyen()
+                            $detailRoute = auth()->user()->isCitoyen() && $declaration->user_id === auth()->id()
                                 ? route('declarations.show', $declaration)
-                                : route('moderation.declarations.show', $declaration);
+                                : (auth()->user()->isCitoyen()
+                                    ? route('public.declarations.show', $declaration)
+                                    : route('moderation.declarations.show', $declaration));
                         @endphp
-                        <article id="declaration-{{ $declaration->id }}" x-data="{ showComments: false }"
+                        <article id="declaration-{{ $declaration->id }}" x-data="{ showComments: window.location.hash === '#declaration-{{ $declaration->id }}', replyTo: null, replyName: '' }"
                                  class="bg-white shadow-sm border border-gray-100 rounded-xl overflow-hidden">
 
                             <div class="flex items-center gap-3 px-4 pt-4">
-                                @if ($declaration->citoyen->photo_path)
+                                @if ($declaration->citoyen->photoUrl())
                                     <img src="{{ $declaration->citoyen->photoUrl() }}" alt="{{ $declaration->citoyen->name }}"
                                          class="w-10 h-10 rounded-full object-cover shrink-0">
                                 @else
@@ -54,46 +59,31 @@
                                     {{ $declaration->type_perte ?? $declaration->type_decouverte ?? ucfirst($declaration->categorie) }}
                                 </h3>
                                 <p class="text-sm text-gray-700 mt-1 whitespace-pre-line">{{ $declaration->description }}</p>
-                                @if ($declaration->localisation)
+                                @if ($declaration->lieu)
                                     <p class="text-xs text-gray-400 mt-2 flex items-center gap-1.5">
                                         <x-icon name="location" class="w-3.5 h-3.5" />
-                                        {{ $declaration->localisation->adresse }}
+                                        {{ $declaration->lieu }}
                                     </p>
                                 @endif
                             </div>
 
-                            @if ($photos->isNotEmpty())
-                                <a href="{{ $detailRoute }}"
-                                   class="mt-3 grid overflow-hidden {{ $photos->count() > 1 ? 'grid-cols-2 gap-0.5' : 'grid-cols-1' }}">
-                                    @foreach ($photos->take(4) as $photo)
-                                        <span class="relative block">
-                                            <img src="{{ $photo->url() }}"
-                                                 alt="{{ $photo->nom_original }}"
-                                                 class="w-full object-cover {{ $photos->count() === 1 ? 'h-56' : 'h-36' }}">
-                                            @if ($loop->last && $photos->count() > 4)
-                                                <span class="absolute inset-0 flex items-center justify-center bg-black/60 text-lg font-semibold text-white">
-                                                    +{{ $photos->count() - 4 }}
-                                                </span>
-                                            @endif
-                                        </span>
-                                    @endforeach
+                            @if ($declaration->photoUrl())
+                                <a href="{{ $detailRoute }}" class="mt-3 block overflow-hidden">
+                                    <img src="{{ $declaration->photoUrl() }}"
+                                         alt="Photo de {{ $declaration->type_perte ?? $declaration->type_decouverte ?? $declaration->categorie }}"
+                                         class="h-56 w-full object-cover">
                                 </a>
                             @endif
 
-                            @if ($documents->isNotEmpty())
-                                <div class="mx-4 mt-3 space-y-2">
-                                    @foreach ($documents->take(2) as $document)
-                                        <a href="{{ $document->url() }}" target="_blank"
-                                           class="flex min-w-0 items-center gap-2 border-t border-gray-100 pt-2 text-xs text-azur hover:text-azur-dark">
-                                            <x-icon name="paperclip" class="h-4 w-4 shrink-0" />
-                                            <span class="truncate">{{ $document->nom_original }}</span>
-                                            <span class="ml-auto shrink-0 text-gray-400">{{ number_format(($document->taille ?? 0) / 1024 / 1024, 1, ',', ' ') }} Mo</span>
-                                        </a>
-                                    @endforeach
+                            <div class="px-4 py-3 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 mt-2">
+                                <div class="flex flex-wrap gap-3 text-xs font-medium text-azur">
+                                    @if ($declaration->facebook_post_url)
+                                        <a href="{{ $declaration->facebook_post_url }}" target="_blank" rel="noopener noreferrer" class="hover:underline">Facebook</a>
+                                    @endif
+                                    @if ($declaration->instagram_post_url)
+                                        <a href="{{ $declaration->instagram_post_url }}" target="_blank" rel="noopener noreferrer" class="hover:underline">Instagram</a>
+                                    @endif
                                 </div>
-                            @endif
-
-                            <div class="px-4 py-3 flex items-center justify-between border-t border-gray-100 mt-2">
                                 <button @click="showComments = ! showComments"
                                         class="flex items-center gap-1.5 text-sm font-medium text-alerte hover:text-alerte-dark transition">
                                     <x-icon name="megaphone" class="w-4 h-4" />
@@ -112,7 +102,7 @@
 
                                 @forelse ($declaration->commentaires as $commentaire)
                                     <div class="flex items-start gap-2">
-                                        @if ($commentaire->auteur->photo_path)
+                                        @if ($commentaire->auteur->photoUrl())
                                             <img src="{{ $commentaire->auteur->photoUrl() }}" alt="{{ $commentaire->auteur->name }}"
                                                  class="w-7 h-7 rounded-full object-cover shrink-0">
                                         @else
@@ -120,22 +110,63 @@
                                                 {{ $commentaire->auteur->initiales() }}
                                             </span>
                                         @endif
-                                        <div class="flex-1 bg-white rounded-lg px-3 py-2">
-                                            <p class="text-xs font-semibold text-gray-800">{{ $commentaire->auteur->name }}</p>
+                                        <div class="flex-1 min-w-0 bg-white rounded-lg px-3 py-2">
+                                            <div class="flex items-center justify-between gap-2">
+                                                <p class="text-xs font-semibold text-gray-800">{{ $commentaire->auteur->name }}</p>
+                                                @if (auth()->user()->isModerateur() || auth()->user()->isAdministrateur())
+                                                    <button type="button" title="Supprimer ce commentaire"
+                                                            aria-label="Supprimer le commentaire de {{ $commentaire->auteur->name }}"
+                                                            x-on:click="$dispatch('open-modal', 'delete-comment-{{ $commentaire->id }}')"
+                                                            class="shrink-0 p-1 text-gray-400 hover:text-alerte">
+                                                        <x-icon name="trash" class="w-4 h-4" />
+                                                    </button>
+                                                @endif
+                                            </div>
+                                            @if ($commentaire->parent)
+                                                <p class="mt-1 text-xs text-azur">En réponse à {{ $commentaire->parent->auteur?->name ?? 'un membre' }}</p>
+                                            @endif
                                             <p class="text-sm text-gray-600">{{ $commentaire->contenu }}</p>
-                                            <p class="text-[11px] text-gray-400 mt-1">{{ $commentaire->created_at->diffForHumans() }}</p>
+                                            <div class="mt-1 flex items-center justify-between gap-2">
+                                                <p class="text-[11px] text-gray-400">{{ $commentaire->created_at->diffForHumans() }}</p>
+                                                <button type="button" data-author="{{ $commentaire->auteur->name }}"
+                                                        x-on:click="replyTo = {{ $commentaire->id }}; replyName = $el.dataset.author; $nextTick(() => $refs.commentInput.focus())"
+                                                        class="text-xs font-medium text-azur hover:underline">Répondre</button>
+                                            </div>
                                         </div>
                                     </div>
+                                    @if (auth()->user()->isModerateur() || auth()->user()->isAdministrateur())
+                                        <x-modal name="delete-comment-{{ $commentaire->id }}" maxWidth="md" focusable>
+                                            <div class="p-6">
+                                                <h3 class="text-base font-semibold text-gray-900">Supprimer ce commentaire ?</h3>
+                                                <p class="mt-2 text-sm text-gray-600">Cette action retirera définitivement l'information du fil.</p>
+                                                <div class="mt-5 flex justify-end gap-3">
+                                                    <button type="button" x-on:click="$dispatch('close-modal', 'delete-comment-{{ $commentaire->id }}')"
+                                                            class="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">Annuler</button>
+                                                    <form method="POST" action="{{ route('moderation.commentaires.supprimer', $commentaire) }}">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="submit" class="px-4 py-2 rounded-md bg-alerte text-sm font-semibold text-white hover:bg-alerte-dark">Supprimer</button>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </x-modal>
+                                    @endif
                                 @empty
                                     <p class="text-xs text-gray-400 text-center">Aucune info partagée. Sois le premier à réagir !</p>
                                 @endforelse
 
+                                <div x-show="replyTo" x-cloak class="flex items-center justify-between gap-2 text-xs text-azur">
+                                    <span>Réponse à <span x-text="replyName"></span></span>
+                                    <button type="button" x-on:click="replyTo = null; replyName = ''" class="text-gray-500 hover:text-gray-900" aria-label="Annuler la réponse">Annuler</button>
+                                </div>
                                 <form method="POST" action="{{ route('declarations.commenter', $declaration) }}" class="flex items-center gap-2 pt-2">
                                     @csrf
+                                    <input type="hidden" name="parent_id" x-bind:value="replyTo || ''">
                                     <input type="text" name="contenu" required maxlength="1000"
+                                           x-ref="commentInput"
                                            placeholder="Partager une info..."
                                            class="flex-1 text-sm border-gray-300 rounded-full focus:border-alerte focus:ring-alerte">
-                                    <button type="submit"
+                                    <button type="submit" title="Envoyer cette information" aria-label="Envoyer cette information"
                                             class="shrink-0 w-9 h-9 rounded-full bg-alerte text-white flex items-center justify-center hover:bg-alerte-dark transition">
                                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                                             <path d="M2 21l21-9L2 3v7l15 2-15 2z"/>

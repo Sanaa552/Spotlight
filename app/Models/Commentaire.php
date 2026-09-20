@@ -10,6 +10,7 @@ class Commentaire extends Model
     protected $fillable = [
         'declaration_id',
         'user_id',
+        'parent_id',
         'contenu',
     ];
 
@@ -21,5 +22,10 @@ class Commentaire extends Model
     public function auteur(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_id');
     }
 }

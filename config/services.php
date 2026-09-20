@@ -46,6 +46,11 @@ return [
         'page_id' => env('META_PAGE_ID'),
         'page_access_token' => env('META_PAGE_ACCESS_TOKEN'),
         'instagram_id' => env('META_INSTAGRAM_ID'),
+        'ca_bundle' => env('META_CA_BUNDLE'),
+    ],
+
+    'openstreetmap' => [
+        'ca_bundle' => env('OSM_CA_BUNDLE', env('META_CA_BUNDLE')),
     ],
 
 ];

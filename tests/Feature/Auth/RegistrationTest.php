@@ -38,6 +38,21 @@ class RegistrationTest extends TestCase
         Notification::assertSentTo($user, SpotlightVerifyEmail::class);
     }
 
+    public function test_registration_normalizes_email_before_sending_verification(): void
+    {
+        Notification::fake();
+
+        $this->post('/register', [
+            'name' => 'Citoyen Test',
+            'email' => ' Citoyen@Example.com ',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+        ])->assertRedirect(route('verification.notice'));
+
+        $user = User::where('email', 'citoyen@example.com')->firstOrFail();
+        Notification::assertSentTo($user, SpotlightVerifyEmail::class);
+    }
+
     public function test_unverified_citizen_cannot_access_dashboard_or_declarations(): void
     {
         $user = User::factory()->unverified()->create();
