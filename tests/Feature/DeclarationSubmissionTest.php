@@ -596,4 +596,71 @@ class DeclarationSubmissionTest extends TestCase
             ->assertForbidden();
         Http::assertNothingSent();
     }
+
+
+    /////
+    public function test_un_citoyen_peut_soumettre_une_declaration_avec_une_piece_jointe_valide(): void
+{
+    Storage::fake('public');
+    Storage::fake('local');
+
+    $citoyen = User::factory()->create();
+
+    $response = $this->actingAs($citoyen)->post(route('declarations.store'), [
+        'type' => 'perte',
+        'categorie' => 'objet',
+        'type_perte' => 'Portefeuille perdu',
+        'description' => 'Portefeuille noir perdu au marché central.',
+        'lieu' => 'Marché central de Douala',
+        'adresse' => 'Marché central, Akwa, Douala',
+        'photo_publique' => UploadedFile::fake()->create(
+            'portefeuille.jpg',
+            1024,
+            'image/jpeg'
+        ),
+        'declaration_perte' => UploadedFile::fake()->create(
+            'declaration-perte.pdf',
+            2048,
+            'application/pdf'
+        ),
+        'pieces_jointes' => [
+            UploadedFile::fake()->create(
+                'justificatif.pdf',
+                1024,
+                'application/pdf'
+            ),
+        ],
+    ]);
+
+    $response
+        ->assertSessionHasNoErrors()
+        ->assertRedirect(route('declarations.index'));
+
+    $this->assertDatabaseCount('declarations', 1);
+    $this->assertDatabaseCount('localisations', 1);
+    $this->assertDatabaseCount('pieces_jointes', 2);
+
+    $this->assertDatabaseHas('pieces_jointes', [
+        'type_document' => 'declaration_perte',
+        'disque' => 'local',
+    ]);
+
+    $this->assertDatabaseHas('pieces_jointes', [
+        'type_document' => 'piece_jointe',
+        'disque' => 'local',
+    ]);
+
+    $this->assertNotNull(
+        Declaration::firstOrFail()->photo_path
+    );
+
+    Storage::disk('local')->assertExists(
+        Declaration::firstOrFail()->photo_path
+    );
+
+    Storage::disk('public')->assertMissing(
+        Declaration::firstOrFail()->photo_path
+    );
+ }
+
 }
