@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\PublishDeclaration;
 use App\Models\Declaration;
 use App\Models\Rapprochement;
 use App\Models\User;
 use App\Notifications\RapprochementUpdate;
+use App\Services\MetaPublishingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
@@ -65,7 +67,7 @@ class RapprochementFlowTest extends TestCase
         $match = Rapprochement::create(['perte_id' => $loss->id, 'decouverte_id' => $found->id]);
 
         $this->actingAs($finder)->post(route('moderation.rapprochements.verifier', $match))->assertForbidden();
-        $this->actingAs($moderator)->post(route('moderation.rapprochements.verifier', $match))->assertSessionHas('success');
+        $this->actingAs($moderator)->post(route('moderation.rapprochements.verifier', $match), ['correspondance_verifiee' => '1'])->assertSessionHas('success');
         $this->assertSame('verifie', $match->fresh()->statut);
         Notification::assertSentTo($owner, RapprochementUpdate::class);
         Notification::assertSentTo($finder, RapprochementUpdate::class);
@@ -97,6 +99,128 @@ class RapprochementFlowTest extends TestCase
         $this->actingAs($finder)->get(route('declarations.create', ['perte_id' => $loss->id]))
             ->assertOk()->assertSee('Aucune annonce choisie');
         $this->get(route('public.declarations.show', $person))->assertNotFound();
+    }
+
+    public function test_linked_discovery_is_reviewed_before_publication_and_handover_waits(): void
+    {
+        Notification::fake();
+        Storage::fake('local');
+        Storage::fake('public');
+        $owner = User::factory()->create();
+        $finder = User::factory()->create();
+        $moderator = User::factory()->create(['role' => 'moderateur']);
+        $loss = $this->loss($owner);
+        $found = $this->pendingFound($finder);
+        $match = Rapprochement::create(['perte_id' => $loss->id, 'decouverte_id' => $found->id]);
+
+        $this->actingAs($moderator)->get(route('moderation.declarations.show', $found))
+            ->assertOk()->assertSee('Vérifiez ou refusez d’abord la correspondance');
+        $this->post(route('moderation.valider', $found), ['preuves_verifiees' => '1'])
+            ->assertSessionHas('warning');
+        $this->assertDatabaseCount('jobs', 0);
+        $this->assertNull($found->fresh()->publication_status);
+        $this->post(route('moderation.rapprochements.verifier', $match))
+            ->assertSessionHasErrors('correspondance_verifiee');
+        $this->post(route('moderation.rapprochements.verifier', $match), ['correspondance_verifiee' => '1'])
+            ->assertSessionHas('success');
+        $this->assertSame('verifie', $match->fresh()->statut);
+        $this->actingAs($finder)->post(route('rapprochements.confirmer', $match))->assertSessionHas('warning');
+        $this->actingAs($moderator)->post(route('moderation.rapprochements.finaliser', $match))->assertSessionHas('warning');
+        $this->post(route('moderation.valider', $found), ['preuves_verifiees' => '1'])
+            ->assertSessionHas('success');
+        $this->assertSame('queued', $found->fresh()->publication_status);
+        $this->assertDatabaseCount('jobs', 1);
+
+        $meta = \Mockery::mock(MetaPublishingService::class);
+        $meta->shouldReceive('publishToFacebook')->once()
+            ->andReturn(['success' => true, 'response' => ['id' => 'fb-found']]);
+        $meta->shouldReceive('facebookPhotoUrl')->once()->with('fb-found')
+            ->andReturn(['success' => true, 'url' => 'https://scontent.example.test/trouve.jpg']);
+        $meta->shouldReceive('publishToInstagram')->once()
+            ->andReturn(['success' => true, 'response' => ['id' => 'ig-found']]);
+        $meta->shouldReceive('publicPostUrl')->twice()
+            ->andReturnUsing(fn ($channel) => "https://example.test/{$channel}-post");
+        (new PublishDeclaration($found->id, $moderator->id))->handle($meta);
+
+        $this->assertSame('validee', $found->fresh()->statut);
+        $this->assertSame('succeeded', $found->fresh()->publication_status);
+        $this->assertSame('validee', $loss->fresh()->statut);
+        $this->assertSame('verifie', $match->fresh()->statut);
+    }
+
+    public function test_rejected_match_allows_independent_discovery_publication(): void
+    {
+        Notification::fake();
+        Storage::fake('local');
+        Storage::fake('public');
+        $loss = $this->loss(User::factory()->create());
+        $found = $this->pendingFound(User::factory()->create());
+        $moderator = User::factory()->create(['role' => 'moderateur']);
+        $match = Rapprochement::create(['perte_id' => $loss->id, 'decouverte_id' => $found->id]);
+
+        $this->actingAs($moderator)->post(route('moderation.rapprochements.rejeter', $match))
+            ->assertSessionHas('success');
+        $this->post(route('moderation.valider', $found), ['preuves_verifiees' => '1'])
+            ->assertSessionHas('success');
+        $this->assertSame('rejete', $match->fresh()->statut);
+        $this->assertSame('queued', $found->fresh()->publication_status);
+    }
+
+    public function test_finder_cannot_add_match_while_discovery_is_being_published(): void
+    {
+        Notification::fake();
+        Storage::fake('local');
+        Storage::fake('public');
+        $loss = $this->loss(User::factory()->create());
+        $finder = User::factory()->create();
+        $found = $this->pendingFound($finder);
+        $moderator = User::factory()->create(['role' => 'moderateur']);
+
+        $this->actingAs($moderator)->post(route('moderation.valider', $found), ['preuves_verifiees' => '1'])
+            ->assertSessionHas('success');
+        $this->actingAs($finder)->post(route('rapprochements.proposer', $found), ['perte_id' => $loss->id])
+            ->assertSessionHas('warning');
+        $this->assertDatabaseCount('rapprochements', 0);
+    }
+
+    public function test_worker_does_not_call_meta_if_an_unreviewed_match_exists(): void
+    {
+        Storage::fake('local');
+        Storage::fake('public');
+        $loss = $this->loss(User::factory()->create());
+        $found = $this->pendingFound(User::factory()->create());
+        $moderator = User::factory()->create(['role' => 'moderateur']);
+        Rapprochement::create(['perte_id' => $loss->id, 'decouverte_id' => $found->id]);
+        $found->update(['publication_status' => 'queued']);
+
+        $meta = \Mockery::mock(MetaPublishingService::class);
+        $meta->shouldNotReceive('publishToFacebook');
+        $meta->shouldNotReceive('publishToInstagram');
+        (new PublishDeclaration($found->id, $moderator->id))->handle($meta);
+
+        $this->assertSame('en_attente', $found->fresh()->statut);
+        $this->assertSame('failed', $found->fresh()->publication_status);
+        $this->assertNull($found->fresh()->facebook_post_id);
+    }
+
+    private function pendingFound(User $finder): Declaration
+    {
+        $found = $finder->declarations()->create([
+            'type' => 'decouverte', 'categorie' => 'objet', 'type_decouverte' => 'Sac trouvé',
+            'description' => 'Sac trouvé au marché.', 'photo_path' => 'photos-publiques/trouve.jpg',
+            'statut' => 'en_attente',
+        ]);
+        Storage::disk('public')->put($found->photo_path, 'photo');
+        foreach (['preuve_decouverte', 'preuve_signalement'] as $type) {
+            $path = 'declarations-privees/'.$type.'.pdf';
+            Storage::disk('local')->put($path, 'preuve');
+            $found->piecesJointes()->create([
+                'type_document' => $type, 'disque' => 'local',
+                'chemin' => $path, 'nom_original' => $type.'.pdf',
+            ]);
+        }
+
+        return $found;
     }
 
     private function loss(User $owner): Declaration

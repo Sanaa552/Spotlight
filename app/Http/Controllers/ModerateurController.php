@@ -140,24 +140,29 @@ class ModerateurController extends Controller
             ]);
 
             $queued = DB::transaction(function () use ($declaration, $moderateur) {
-                $updated = Declaration::query()
-                    ->whereKey($declaration->id)
-                    ->where('statut', 'en_attente')
-                    ->where(fn ($query) => $query->whereNull('publication_status')->orWhere('publication_status', 'failed'))
-                    ->update([
-                        'publication_status' => 'queued',
-                        'publication_error' => null,
-                        'moderateur_id' => $moderateur->id,
-                    ]);
-
-                if ($updated) {
-                    PublishDeclaration::dispatch($declaration->id, $moderateur->id)->onConnection('database');
+                $dossier = Declaration::query()->whereKey($declaration->id)->lockForUpdate()->firstOrFail();
+                if ($dossier->statut !== 'en_attente' || ! in_array($dossier->publication_status, [null, 'failed'], true)) {
+                    return 'busy';
+                }
+                if ($dossier->type === 'decouverte' && $dossier->categorie === 'objet'
+                    && $dossier->rapprochementDecouverte()->where('statut', 'propose')->exists()) {
+                    return 'match_pending';
                 }
 
-                return $updated;
+                $dossier->update([
+                    'publication_status' => 'queued',
+                    'publication_error' => null,
+                    'moderateur_id' => $moderateur->id,
+                ]);
+                PublishDeclaration::dispatch($declaration->id, $moderateur->id)->onConnection('database');
+
+                return 'queued';
             });
 
-            if (! $queued) {
+            if ($queued === 'match_pending') {
+                return back()->with('warning', 'Vérifiez ou refusez d’abord la correspondance avec la perte. Aucune publication publique n’a été lancée.');
+            }
+            if ($queued !== 'queued') {
                 return back()->with('warning', 'La publication de ce dossier est déjà en cours. Actualisez la liste.');
             }
 

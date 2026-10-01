@@ -112,6 +112,9 @@ class Declaration extends Model
             $precision,
             $this->description,
             'Secteur : '.($this->lieu ?: 'Non précisé'),
+            $this->type === 'decouverte' && $this->categorie === 'objet'
+                ? 'Aucune restitution n’est confirmée dans cette annonce. Pour toute information, contactez Spotlight.'
+                : null,
         ]));
     }
     

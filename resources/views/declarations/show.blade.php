@@ -38,8 +38,8 @@
                         <p class="mt-2 text-sm text-gray-700">Perte #{{ $match->perte_id }} :
                             <a href="{{ auth()->user()->isCitoyen() ? route('public.declarations.show', $match->perte) : route('moderation.declarations.show', $match->perte) }}" class="font-medium text-azur underline">{{ $match->perte->type_perte ?: 'Objet perdu' }}</a>
                         </p>
-                        <p class="mt-1 text-sm text-gray-600">{{ $match->statut === 'propose' ? 'Proposition en attente de vérification.' : ($match->statut === 'verifie' ? 'Correspondance vérifiée ; la remise reste à confirmer.' : 'Restitution confirmée.') }}</p>
-                        @if ($match->statut === 'verifie' && auth()->user()->isCitoyen() && $declaration->user_id === auth()->id())
+                        <p class="mt-1 text-sm text-gray-600">{{ $match->statut === 'propose' ? 'Proposition en attente de vérification. La découverte ne sera pas publiée avant cette décision.' : ($match->statut === 'verifie' ? 'Correspondance possible vérifiée ; aucune restitution n’est encore confirmée.' : 'Restitution confirmée.') }}</p>
+                        @if ($match->statut === 'verifie' && $declaration->statut === 'validee' && $match->perte->statut === 'validee' && auth()->user()->isCitoyen() && $declaration->user_id === auth()->id())
                             @if ($match->decouvreur_confirme_at)
                                 <p class="mt-3 text-sm text-sonar-dark">Vous avez confirmé la remise. La modération attend les autres vérifications.</p>
                             @else
@@ -60,8 +60,9 @@
                                 <button type="button" x-on:click="action = 'rejeter'" class="text-sm font-semibold text-alerte underline">Refuser</button>
                                 <form x-show="action === 'verifier'" x-cloak method="POST" action="{{ route('moderation.rapprochements.verifier', $match) }}" class="w-full text-sm text-gray-700">
                                     @csrf
-                                    Vérifiez les preuves des deux dossiers avant de confirmer.
-                                    <button type="submit" class="ml-2 font-semibold text-sonar-dark underline">Confirmer</button>
+                                    <label class="flex items-start gap-2"><input type="checkbox" name="correspondance_verifiee" value="1" required class="mt-1 rounded border-gray-300 text-sonar focus:ring-sonar"><span>J’ai comparé les deux dossiers et les preuves privées. Cela confirme une correspondance possible, pas une restitution.</span></label>
+                                    @error('correspondance_verifiee')<p role="alert" class="text-alerte-dark">{{ $message }}</p>@enderror
+                                    <button type="submit" class="mt-2 font-semibold text-sonar-dark underline">Confirmer la correspondance</button>
                                 </form>
                                 <form x-show="action === 'rejeter'" x-cloak method="POST" action="{{ route('moderation.rapprochements.rejeter', $match) }}" class="w-full text-sm text-gray-700">
                                     @csrf
@@ -97,7 +98,7 @@
                     <section class="bg-white border border-gray-100 rounded-md p-5">
                         <h3 class="text-base font-semibold text-gray-900">Découverte rapprochée</h3>
                         <p class="mt-2 text-sm text-gray-700">Une découverte #{{ $match->decouverte_id }} a été vérifiée par la modération. Organisez la remise avec les autorités ; vos coordonnées ne sont pas communiquées automatiquement.</p>
-                        @if ($match->statut === 'verifie' && auth()->user()->isCitoyen() && $declaration->user_id === auth()->id())
+                        @if ($match->statut === 'verifie' && $declaration->statut === 'validee' && $match->decouverte->statut === 'validee' && auth()->user()->isCitoyen() && $declaration->user_id === auth()->id())
                             @if ($match->proprietaire_confirme_at)
                                 <p class="mt-3 text-sm text-sonar-dark">Vous avez confirmé la réception de l’objet.</p>
                             @else
@@ -305,9 +306,11 @@
                         <p class="mt-2 text-sm text-alerte-dark">Un justificatif obligatoire manque. Demandez au citoyen de compléter le dossier avant toute validation.</p>
                     @elseif ($publicationEnCours)
                         <p class="mt-2 text-sm text-azur">La publication est en cours. Attendez son résultat avant toute autre action.</p>
+                    @elseif ($declaration->type === 'decouverte' && $declaration->categorie === 'objet' && $declaration->rapprochementDecouverte?->statut === 'propose')
+                        <p class="mt-2 text-sm text-alerte-dark">Cette découverte est liée à une perte. Vérifiez ou refusez d’abord la correspondance ci-dessus ; aucune publication ne partira sur Facebook ou Instagram avant votre décision.</p>
                     @else
                         @if ($declaration->type === 'decouverte' && $declaration->categorie === 'objet')
-                            <p class="mt-2 text-sm text-gray-600">Contrôlez la vidéo privée et le justificatif des autorités. Ne publiez pas si le document ne permet pas de confirmer la remise effective de l’objet à un poste identifié.</p>
+                            <p class="mt-2 text-sm text-gray-600">Contrôlez la vidéo privée, le justificatif des autorités, la photo et le texte destinés au public. Ne publiez pas si le document ne confirme pas la remise à un poste identifié ou si le texte affirme une restitution non vérifiée.</p>
                         @elseif ($declaration->type === 'decouverte')
                             <p class="mt-2 text-sm text-gray-600">Contrôlez le justificatif de signalement aux autorités. Ce dossier restera strictement privé.</p>
                         @else
@@ -322,7 +325,7 @@
                                        class="mt-0.5 rounded border-gray-300 text-sonar focus:ring-sonar">
                                 <span>
                                     @if ($declaration->type === 'decouverte' && $declaration->categorie === 'objet')
-                                        J’ai examiné la vidéo et le justificatif des autorités ; celui-ci confirme que l’objet a été remis à un poste identifié.
+                                        J’ai examiné la vidéo, le justificatif des autorités, la photo et le texte public ; l’objet a été remis à un poste identifié et aucune restitution non vérifiée n’est annoncée.
                                     @elseif ($declaration->type === 'decouverte')
                                         J’ai examiné le justificatif de signalement aux autorités et je confirme le suivi privé de ce dossier.
                                     @else

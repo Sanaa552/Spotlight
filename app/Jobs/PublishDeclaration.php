@@ -51,6 +51,18 @@ class PublishDeclaration implements ShouldQueue
         $declaration = Declaration::findOrFail($this->declarationId);
 
         try {
+            if ($declaration->type === 'decouverte' && $declaration->categorie === 'objet'
+                && $declaration->rapprochementDecouverte()->where('statut', 'propose')->exists()) {
+                $declaration->update([
+                    'publication_status' => 'failed',
+                    'publication_error' => 'Correspondance avec une perte non vérifiée. Demandez à la modération de la vérifier ou de la refuser avant de relancer.',
+                ]);
+                Log::warning('Publication bloquee par correspondance non verifiee Spotlight', [
+                    'declaration_id' => $declaration->id,
+                ]);
+                return;
+            }
+
             if ($declaration->photoEnAttente()) {
                 $this->rendrePhotoPublique($declaration);
             }

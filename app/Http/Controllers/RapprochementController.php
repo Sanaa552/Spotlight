@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class RapprochementController extends Controller
@@ -73,6 +74,11 @@ class RapprochementController extends Controller
         }
 
         $rapprochement = DB::transaction(function () use ($declaration, $perte) {
+            $decouverte = Declaration::query()->whereKey($declaration->id)->lockForUpdate()->firstOrFail();
+            if (! in_array($decouverte->statut, ['en_attente', 'validee'], true)
+                || ($decouverte->statut === 'en_attente' && in_array($decouverte->publication_status, ['queued', 'processing'], true))) {
+                return 'publication_en_cours';
+            }
             $existant = Rapprochement::query()->where('decouverte_id', $declaration->id)->lockForUpdate()->first();
             if ($existant && $existant->statut !== 'rejete') {
                 return null;
@@ -89,6 +95,9 @@ class RapprochementController extends Controller
             ]);
         });
 
+        if ($rapprochement === 'publication_en_cours') {
+            return back()->with('warning', 'La publication de cette découverte est déjà en cours. Attendez son résultat avant de proposer une correspondance.');
+        }
         if (! $rapprochement) {
             return back()->with('warning', 'Une correspondance est déjà en cours pour cette découverte. Contactez la modération pour la corriger.');
         }
@@ -102,13 +111,28 @@ class RapprochementController extends Controller
 
     public function verifier(Request $request, Rapprochement $rapprochement, RapprochementNotifier $notifier): RedirectResponse
     {
+        $request->validate(['correspondance_verifiee' => ['accepted']], [
+            'correspondance_verifiee.accepted' => 'Confirmez la comparaison des deux dossiers et des preuves privées.',
+        ]);
+
         $updated = DB::transaction(function () use ($rapprochement, $request) {
             $match = Rapprochement::query()->whereKey($rapprochement->id)->lockForUpdate()->firstOrFail();
             $perte = Declaration::query()->whereKey($match->perte_id)->lockForUpdate()->firstOrFail();
             $decouverte = Declaration::query()->whereKey($match->decouverte_id)->lockForUpdate()->firstOrFail();
-            if ($match->statut !== 'propose' || $perte->statut !== 'validee' || $decouverte->statut !== 'validee'
+            if ($match->statut !== 'propose' || $perte->statut !== 'validee'
+                || ! in_array($decouverte->statut, ['en_attente', 'validee'], true)
+                || in_array($decouverte->publication_status, ['queued', 'processing'], true)
+                || $perte->type !== 'perte' || $decouverte->type !== 'decouverte'
                 || $perte->categorie !== 'objet' || $decouverte->categorie !== 'objet') {
                 return false;
+            }
+            if ($decouverte->statut === 'en_attente') {
+                foreach (['preuve_decouverte', 'preuve_signalement'] as $type) {
+                    $document = $decouverte->piecesJointes()->where('type_document', $type)->first();
+                    if (! $document || ! Storage::disk($document->disque)->exists($document->chemin)) {
+                        return false;
+                    }
+                }
             }
             if (Rapprochement::query()->where('perte_id', $perte->id)->where('statut', 'verifie')->exists()) {
                 return false;
@@ -118,7 +142,7 @@ class RapprochementController extends Controller
         });
 
         if (! $updated) {
-            return back()->with('warning', 'Vérification impossible : les deux déclarations doivent d’abord être validées et encore actives.');
+            return back()->with('warning', 'Correspondance non vérifiée. La perte doit être publiée, la découverte active et ses preuves privées disponibles. Vérifiez aussi qu’aucune publication n’est en cours.');
         }
 
         Log::info('Correspondance verifiee Spotlight', ['rapprochement_id' => $rapprochement->id, 'moderateur_id' => $request->user()->id]);
@@ -146,6 +170,10 @@ class RapprochementController extends Controller
         $owner = $rapprochement->perte->user_id === $request->user()->id;
         $finder = $rapprochement->decouverte->user_id === $request->user()->id;
         abort_unless($owner || $finder, 403);
+
+        if ($rapprochement->perte->statut !== 'validee' || $rapprochement->decouverte->statut !== 'validee') {
+            return back()->with('warning', 'Attendez la publication des deux déclarations avant de confirmer la remise.');
+        }
 
         $updated = Rapprochement::query()->whereKey($rapprochement->id)->where('statut', 'verifie')->update([
             $owner ? 'proprietaire_confirme_at' : 'decouvreur_confirme_at' => now(),

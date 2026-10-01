@@ -33,7 +33,7 @@ class RapprochementNotifier
             collect([$rapprochement->decouverte->citoyen, ...($acceptee ? [$rapprochement->perte->citoyen] : [])])->unique('id'),
             $rapprochement->decouverte_id,
             $acceptee
-                ? "La modération a vérifié une correspondance possible entre les dossiers #{$rapprochement->perte_id} et #{$rapprochement->decouverte_id}. La remise doit être organisée avec les autorités ; confirmez-la seulement après qu'elle a réellement eu lieu."
+                ? "La modération a vérifié une correspondance possible entre les dossiers #{$rapprochement->perte_id} et #{$rapprochement->decouverte_id}. Cela ne confirme pas une restitution. Attendez la validation des deux dossiers, organisez la remise avec les autorités, puis confirmez-la seulement après qu'elle a réellement eu lieu."
                 : "La correspondance proposée pour votre découverte #{$rapprochement->decouverte_id} n'a pas été retenue. Votre déclaration reste suivie séparément.",
             $acceptee ? 'Correspondance vérifiée - Spotlight' : 'Correspondance non retenue - Spotlight',
             null,
