@@ -73,14 +73,17 @@
                         @endif
                         @if (!auth()->user()->isCitoyen() && $match->statut === 'verifie')
                             <p class="mt-3 text-xs text-gray-600">Déclarant de perte : {{ $match->perte->citoyen->name }} ({{ $match->perte->citoyen->email }}). Déclarant de découverte : {{ $declaration->citoyen->name }} ({{ $declaration->citoyen->email }}). Coordonnez la remise avec les autorités.</p>
-                            <p class="mt-2 text-xs text-gray-600">Propriétaire : {{ $match->proprietaire_confirme_at ? 'remise confirmée' : 'confirmation attendue' }}. Découvreur : {{ $match->decouvreur_confirme_at ? 'remise confirmée' : 'confirmation attendue' }}.</p>
-                            @if ($match->proprietaire_confirme_at && $match->decouvreur_confirme_at)
-                                <form method="POST" action="{{ route('moderation.rapprochements.finaliser', $match) }}" class="mt-3" x-data="{ confirm: false }">
+                            <p class="mt-2 text-xs text-gray-600">Propriétaire : {{ $match->proprietaire_confirme_at ? 'réception confirmée' : 'confirmation attendue' }}. Découvreur : {{ $match->decouvreur_confirme_at ? 'remise confirmée' : 'confirmation facultative' }}.</p>
+                            @if ($match->proprietaire_confirme_at)
+                                <form method="POST" action="{{ route('moderation.rapprochements.finaliser', $match) }}" class="mt-3 space-y-3">
                                     @csrf
-                                    <button type="button" x-on:click="confirm = true" class="text-sm font-semibold text-sonar-dark underline">Clôturer les deux dossiers</button>
-                                    <div x-show="confirm" x-cloak class="mt-2 text-sm text-gray-700">La restitution a-t-elle été contrôlée ?
-                                        <button type="submit" class="ml-2 font-semibold text-sonar-dark underline">Oui, clôturer</button>
-                                    </div>
+                                    <label class="block text-sm font-medium text-gray-700" for="restitution-note-{{ $match->id }}">Contrôle de la remise <span class="text-alerte" aria-hidden="true">*</span></label>
+                                    <textarea id="restitution-note-{{ $match->id }}" name="restitution_note" rows="3" minlength="10" maxlength="1000" required class="w-full rounded-md border-gray-300 text-sm">{{ old('restitution_note') }}</textarea>
+                                    <p class="text-xs text-gray-500">Note interne : indiquez comment la remise effective a été vérifiée. Elle ne sera pas publiée.</p>
+                                    @error('restitution_note')<p role="alert" class="text-alerte-dark">{{ $message }}</p>@enderror
+                                    <label class="flex items-start gap-2 text-sm text-gray-700"><input type="checkbox" name="restitution_verifiee" value="1" required class="mt-1 rounded border-gray-300 text-sonar focus:ring-sonar"><span>J’ai contrôlé la restitution effective de l’objet au propriétaire. <span class="text-alerte" aria-hidden="true">*</span></span></label>
+                                    @error('restitution_verifiee')<p role="alert" class="text-alerte-dark">{{ $message }}</p>@enderror
+                                    <button type="submit" class="rounded-md bg-sonar px-4 py-2 text-sm font-semibold text-white">Clôturer et publier l’avis de restitution</button>
                                 </form>
                             @endif
                         @endif
@@ -98,6 +101,13 @@
                     <section class="bg-white border border-gray-100 rounded-md p-5">
                         <h3 class="text-base font-semibold text-gray-900">Découverte rapprochée</h3>
                         <p class="mt-2 text-sm text-gray-700">Une découverte #{{ $match->decouverte_id }} a été vérifiée par la modération. Organisez la remise avec les autorités ; vos coordonnées ne sont pas communiquées automatiquement.</p>
+                        @if ($match->statut === 'verifie' && $match->decouverte->statut === 'validee' && $match->decouverte->poste_verifie_at && $match->decouverte->poste_verifie_nom)
+                            @if ($match->decouverte->depotDocumentaire())
+                                <p class="mt-2 text-sm font-medium text-sonar-dark">Poste indiqué sur le justificatif : {{ $match->decouverte->poste_verifie_nom }}. La présence actuelle de l’objet n’a pas été confirmée directement. Contactez le poste avant de vous déplacer ; la restitution n’est pas confirmée.</p>
+                            @else
+                                <p class="mt-2 text-sm font-medium text-sonar-dark">Objet localisé auprès de : {{ $match->decouverte->poste_verifie_nom }}. La restitution n’est pas encore confirmée.</p>
+                            @endif
+                        @endif
                         @if ($match->statut === 'verifie' && $declaration->statut === 'validee' && $match->decouverte->statut === 'validee' && auth()->user()->isCitoyen() && $declaration->user_id === auth()->id())
                             @if ($match->proprietaire_confirme_at)
                                 <p class="mt-3 text-sm text-sonar-dark">Vous avez confirmé la réception de l’objet.</p>
@@ -144,8 +154,11 @@
                     <span class="h-4 w-4 animate-spin rounded-full border-2 border-azur border-t-transparent" aria-hidden="true"></span>
                     Publication en cours. Vous serez informé du résultat.
                 </p>
-                <p x-show="delayed" style="display:none" class="mb-3 text-sm text-laiton" role="status">La publication prend plus de temps que prévu. Votre dossier reste suivi par la modération.</p>
-                <p x-show="status === 'failed'" style="display:none" class="mb-3 text-sm text-laiton" role="status">Une étape de publication reste à confirmer. L’équipe de modération s’en occupe ; aucune action n’est nécessaire de votre part.</p>
+                <p x-show="delayed" style="display:none" class="mb-3 text-sm text-laiton" role="status">{{ auth()->user()->isCitoyen() ? 'La publication attend toujours son traitement. Votre dossier reste suivi par la modération.' : 'La publication attend depuis plus de deux minutes. Vérifiez que le service de file d’attente fonctionne avant de relancer.' }}</p>
+                <p x-show="status === 'failed'" style="display:none" class="mb-3 text-sm text-laiton" role="status">{{ auth()->user()->isCitoyen() ? 'Une étape de publication reste à confirmer. L’équipe de modération s’en occupe ; aucune action n’est nécessaire de votre part.' : 'Publication non confirmée. Consultez l’erreur ci-dessous avant de relancer.' }}</p>
+                @if (! auth()->user()->isCitoyen())
+                    <p x-show="status === 'failed' && error" x-text="error" x-cloak class="mb-3 text-sm text-alerte-dark" role="alert"></p>
+                @endif
                 <p x-show="status === 'succeeded'" style="display:none" class="mb-3 text-sm text-sonar-dark" role="status">Votre déclaration est publiée sur Facebook, Instagram et Spotlight.</p>
 
                 @if ($declaration->type === 'decouverte' && $declaration->categorie === 'personne')
@@ -266,11 +279,11 @@
                     <p class="mt-1 text-sm text-gray-600">Votre dossier reste en attente. Une preuve délivrée par les autorités est indispensable avant sa validation.</p>
                     <form method="POST" action="{{ route('declarations.preuve-signalement.store', $declaration) }}" enctype="multipart/form-data" class="mt-4 space-y-3">
                         @csrf
-                        <label for="preuve_signalement" class="block text-sm font-medium text-gray-700">Récépissé, procès-verbal ou document de signalement</label>
+                        <label for="preuve_signalement" class="block text-sm font-medium text-gray-700">Récépissé, procès-verbal ou document de signalement <span class="text-alerte" aria-hidden="true">*</span><span class="sr-only"> (obligatoire)</span></label>
                         <input id="preuve_signalement" name="preuve_signalement" type="file" required accept=".jpg,.jpeg,.png,.pdf"
                                class="block w-full text-sm text-gray-600" />
                         <x-input-error :messages="$errors->get('preuve_signalement')" class="mt-2" />
-                        <p class="text-xs text-gray-500">JPG, PNG ou PDF ; 10 Mo maximum. Ce document reste privé.</p>
+                        <p class="text-xs text-gray-500">Joignez le document reçu de la police ou de la gendarmerie après la remise de l'objet ou le signalement de la personne. Il sert à la vérification par la modération, reste privé et n'est jamais publié. JPG, PNG ou PDF ; 10 Mo maximum.</p>
                         <button type="submit" class="rounded-md bg-sonar px-4 py-2 text-sm font-semibold text-white hover:bg-sonar-dark">
                             Ajouter le justificatif
                         </button>
@@ -303,14 +316,28 @@
                 <section class="bg-white border border-gray-200 rounded-md p-5 sm:p-6">
                     <h4 class="text-base font-semibold text-gray-900">Décision de modération</h4>
                     @if ($preuveRequiseManquante)
-                        <p class="mt-2 text-sm text-alerte-dark">Un justificatif obligatoire manque. Demandez au citoyen de compléter le dossier avant toute validation.</p>
+                        <p class="mt-2 text-sm text-alerte-dark">{{ $declaration->type === 'decouverte' && ! $preuveSignalement ? 'Le justificatif des autorités manque. Le déclarant peut l’ajouter depuis son dossier après le dépôt ou le signalement ; aucune publication ne sera lancée avant sa vérification.' : 'Une preuve obligatoire manque. Ce dossier ne peut pas être validé.' }}</p>
+                        @if ($declaration->type === 'decouverte' && ! $preuveSignalement)
+                            <form method="POST" action="{{ route('moderation.demander-justificatif', $declaration) }}" x-data="{ confirm: false, sending: false }" x-on:submit="sending = true" class="mt-3">
+                                @csrf
+                                <button type="button" x-show="!confirm" x-on:click="confirm = true" class="text-sm font-semibold text-azur underline">Demander le justificatif</button>
+                                <div x-show="confirm" x-cloak class="text-sm text-gray-700">
+                                    Envoyer un email et une notification privée au déclarant ?
+                                    <button type="submit" x-bind:disabled="sending" class="ml-2 font-semibold text-sonar-dark underline disabled:opacity-50">Envoyer</button>
+                                    <button type="button" x-on:click="confirm = false" class="ml-2 text-gray-500 underline">Annuler</button>
+                                </div>
+                            </form>
+                        @endif
                     @elseif ($publicationEnCours)
-                        <p class="mt-2 text-sm text-azur">La publication est en cours. Attendez son résultat avant toute autre action.</p>
+                        <p class="mt-2 text-sm text-azur">{{ $declaration->publication_status === 'queued' ? 'La publication attend dans la file. Aucun envoi Facebook ou Instagram n’a encore commencé ; l’administrateur doit vérifier le service de traitement.' : 'Publication en cours sur Facebook et Instagram. Attendez son résultat avant toute autre action.' }}</p>
                     @elseif ($declaration->type === 'decouverte' && $declaration->categorie === 'objet' && $declaration->rapprochementDecouverte?->statut === 'propose')
                         <p class="mt-2 text-sm text-alerte-dark">Cette découverte est liée à une perte. Vérifiez ou refusez d’abord la correspondance ci-dessus ; aucune publication ne partira sur Facebook ou Instagram avant votre décision.</p>
                     @else
+                        @if ($declaration->publication_status === 'failed' && $declaration->publication_error)
+                            <p class="mt-2 text-sm text-alerte-dark" role="alert">{{ $declaration->publication_error }}</p>
+                        @endif
                         @if ($declaration->type === 'decouverte' && $declaration->categorie === 'objet')
-                            <p class="mt-2 text-sm text-gray-600">Contrôlez la vidéo privée, le justificatif des autorités, la photo et le texte destinés au public. Ne publiez pas si le document ne confirme pas la remise à un poste identifié ou si le texte affirme une restitution non vérifiée.</p>
+                            <p class="mt-2 text-sm text-gray-600">Contrôlez la vidéo privée, le justificatif des autorités, la photo et le texte public. Choisissez la méthode réellement utilisée : examen du document, appel ou visite. Un document examiné ne confirme pas à lui seul que le poste détient encore l’objet. Ne publiez jamais une restitution non vérifiée.</p>
                         @elseif ($declaration->type === 'decouverte')
                             <p class="mt-2 text-sm text-gray-600">Contrôlez le justificatif de signalement aux autorités. Ce dossier restera strictement privé.</p>
                         @else
@@ -325,14 +352,53 @@
                                        class="mt-0.5 rounded border-gray-300 text-sonar focus:ring-sonar">
                                 <span>
                                     @if ($declaration->type === 'decouverte' && $declaration->categorie === 'objet')
-                                        J’ai examiné la vidéo, le justificatif des autorités, la photo et le texte public ; l’objet a été remis à un poste identifié et aucune restitution non vérifiée n’est annoncée.
+                                        J’ai examiné la vidéo, le justificatif des autorités, la photo et le texte public ; le document indique un poste identifiable et aucune restitution non vérifiée n’est annoncée.
                                     @elseif ($declaration->type === 'decouverte')
                                         J’ai examiné le justificatif de signalement aux autorités et je confirme le suivi privé de ce dossier.
                                     @else
                                         J’ai examiné la preuve de signalement de perte aux autorités.
                                     @endif
+                                    <span class="text-alerte" aria-hidden="true">*</span><span class="sr-only"> (obligatoire)</span>
                                 </span>
                             </label>
+                            @if ($declaration->type === 'decouverte' && $declaration->categorie === 'objet')
+                                <div class="space-y-3 border-t border-gray-100 pt-4">
+                                    <div>
+                                        <x-input-label for="poste_verifie_nom" value="Poste indiqué sur le justificatif" required />
+                                        <x-text-input id="poste_verifie_nom" name="poste_verifie_nom" type="text" maxlength="255" required
+                                                      class="mt-1 block w-full" :value="old('poste_verifie_nom', $declaration->poste_verifie_nom ?: $declaration->localisation?->poste_prevu)" />
+                                        @if ($declaration->localisation?->poste_prevu)
+                                            <p class="mt-1 text-xs text-gray-500">Nom proposé d’après le choix du déclarant. Comparez-le au justificatif, puis corrigez-le si le poste ou le quartier diffère. Ce choix seul ne prouve pas le dépôt.</p>
+                                        @else
+                                            <p class="mt-1 text-xs text-gray-500">Aucun poste n’a été choisi lors de la déclaration. Saisissez celui qui figure sur le justificatif. Si le document ne permet pas d’identifier un poste, ne publiez pas.</p>
+                                        @endif
+                                        <p class="mt-1 text-xs text-gray-500">Le poste retenu sera indiqué au propriétaire et dans l’annonce, jamais l’adresse privée du découvreur.</p>
+                                        <x-input-error :messages="$errors->get('poste_verifie_nom')" class="mt-1" />
+                                    </div>
+                                    <div>
+                                        <x-input-label for="poste_verification_methode" value="Méthode de contrôle du dépôt" required />
+                                        <select id="poste_verification_methode" name="poste_verification_methode" required class="mt-1 block w-full rounded-md border-gray-300 text-sm">
+                                            <option value="">Choisir la méthode</option>
+                                            <option value="documentaire" @selected(old('poste_verification_methode', $declaration->poste_verification_methode) === 'documentaire')>Examen du justificatif transmis (sans confirmation directe du poste)</option>
+                                            <option value="appel" @selected(old('poste_verification_methode', $declaration->poste_verification_methode) === 'appel')>Confirmation auprès du poste</option>
+                                            <option value="visite" @selected(old('poste_verification_methode', $declaration->poste_verification_methode) === 'visite')>Vérification sur place</option>
+                                        </select>
+                                        <x-input-error :messages="$errors->get('poste_verification_methode')" class="mt-1" />
+                                    </div>
+                                    <div>
+                                        <x-input-label for="poste_verification_note" value="Compte rendu du contrôle" required />
+                                        <textarea id="poste_verification_note" name="poste_verification_note" rows="2" minlength="10" maxlength="1000" required
+                                                  class="mt-1 block w-full rounded-md border-gray-300 text-sm">{{ old('poste_verification_note', $declaration->poste_verification_note) }}</textarea>
+                                        <p class="mt-1 text-xs text-gray-500">Pour le document : date, référence, poste, éléments cohérents et limites du contrôle. Pour un appel ou une visite : date, service et réponse obtenue. Cette note reste privée.</p>
+                                        <x-input-error :messages="$errors->get('poste_verification_note')" class="mt-1" />
+                                    </div>
+                                    <label class="flex items-start gap-2 text-sm text-gray-800">
+                                        <input type="checkbox" name="depot_verifie" value="1" required class="mt-1 rounded border-gray-300 text-sonar focus:ring-sonar">
+                                        <span>J’atteste avoir effectué la méthode indiquée. Un contrôle documentaire seul n’atteste pas que le poste détient toujours l’objet. <span class="text-alerte" aria-hidden="true">*</span></span>
+                                    </label>
+                                    <x-input-error :messages="$errors->get('depot_verifie')" class="mt-1" />
+                                </div>
+                            @endif
                             @error('preuves_verifiees')
                                 <p role="alert" class="text-sm text-alerte-dark">{{ $message }}</p>
                             @enderror

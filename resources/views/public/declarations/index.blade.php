@@ -11,6 +11,7 @@
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
 
+    <x-theme-init />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="font-sans antialiased bg-nuit">
@@ -63,6 +64,13 @@
                         <div class="p-4">
                             <div class="flex items-center gap-2 mb-2">
                                 <x-status-badge :statut="$declaration->statut" />
+                                @if ($declaration->type === 'perte' && $declaration->aDecouverteDocumentee())
+                                    <span class="text-xs font-semibold text-sonar">Dépôt documenté, non restitué</span>
+                                @elseif ($declaration->type === 'perte' && $declaration->estLocalisee())
+                                    <span class="text-xs font-semibold text-sonar">Localisé, non restitué</span>
+                                @elseif ($declaration->type === 'decouverte' && $declaration->categorie === 'objet' && $declaration->statut === 'validee' && $declaration->poste_verifie_at && $declaration->poste_verifie_nom)
+                                    <span class="text-xs font-semibold text-sonar">{{ $declaration->depotDocumentaire() ? 'Dépôt documenté, restitution en attente' : 'Déposé, restitution en attente' }}</span>
+                                @endif
                                 @if ($declaration->lieu)
                                     <span class="text-xs text-argent/40"> {{ $declaration->lieu }}</span>
                                 @endif

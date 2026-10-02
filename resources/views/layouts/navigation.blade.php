@@ -16,6 +16,10 @@
                             <path d="M12 3l9 8h-3v9h-5v-6H11v6H6v-9H3l9-8z"/>
                         </svg>
                     </a>
+                    <a href="{{ route('public.declarations.index') }}" title="Voir les avis" aria-label="Voir les avis"
+                       class="p-2.5 rounded-full transition text-argent/60 hover:text-argent hover:bg-white/5">
+                        <x-icon name="search" class="w-5 h-5" />
+                    </a>
 
                     @auth
                         @if (auth()->user()->isCitoyen())
@@ -77,6 +81,7 @@
 
             <!-- Settings Dropdown -->
             <div class="hidden sm:flex sm:items-center sm:ms-6">
+                <x-theme-toggle class="mr-2" />
                 <x-dropdown align="right" width="48">
                                         <x-slot name="trigger">
                         <button class="flex items-center gap-2 text-sm font-medium text-argent/70 hover:text-argent focus:outline-none transition">
@@ -124,6 +129,7 @@
 
             <!-- Hamburger -->
             <div class="-me-2 flex items-center sm:hidden">
+                <x-theme-toggle />
                 <button @click="open = ! open" class="inline-flex items-center justify-center p-2 rounded-md text-argent/60 hover:text-argent hover:bg-white/5 focus:outline-none focus:bg-white/5 transition duration-150 ease-in-out">
                     <svg class="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
                         <path :class="{'hidden': open, 'inline-flex': ! open }" class="inline-flex" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
@@ -139,6 +145,9 @@
         <div class="pt-2 pb-3 space-y-1">
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                 {{ __('Accueil') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('public.declarations.index')" :active="request()->routeIs('public.declarations.*')">
+                {{ __('Voir les avis') }}
             </x-responsive-nav-link>
 
             @auth
@@ -195,7 +204,7 @@
     </div>
 
     @auth
-        <div class="sm:hidden fixed bottom-0 inset-x-0 z-40 border-t border-white/10 bg-nuit/95 shadow-[0_-10px_30px_rgba(0,0,0,0.25)] backdrop-blur">
+        <div class="spotlight-bottom-nav sm:hidden fixed bottom-0 inset-x-0 z-40 border-t border-white/10 bg-nuit/95 shadow-[0_-10px_30px_rgba(0,0,0,0.25)] backdrop-blur">
             <div class="mx-auto grid max-w-md grid-cols-5 items-end gap-1 px-2 pb-[calc(env(safe-area-inset-bottom)+0.45rem)] pt-2">
                 <a href="{{ route('dashboard') }}"
                    class="flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-lg px-1 text-[11px] font-medium transition {{ request()->routeIs('dashboard') ? 'text-white bg-alerte/15' : 'text-argent/60' }}">

@@ -33,7 +33,7 @@
                             @if ($notification->declaration)
                                 <a href="{{ str_starts_with($notification->message, 'Nouvelle information') || str_starts_with($notification->message, 'Nouvelle réponse') ? route('public.declarations.show', $notification->declaration).'#discussion' : (auth()->user()->isCitoyen() && $notification->declaration->user_id === auth()->id() ? route('declarations.show', $notification->declaration) : (auth()->user()->isCitoyen() ? route('public.declarations.show', $notification->declaration) : route('moderation.declarations.show', $notification->declaration))) }}"
                                    class="text-xs text-indigo-600 hover:underline mt-2 inline-block">
-                                    {{ str_starts_with($notification->message, 'Nouvelle information') || str_starts_with($notification->message, 'Nouvelle réponse') ? 'Voir la discussion' : 'Voir la déclaration' }} #{{ $notification->declaration->id }} →
+                                    {{ str_starts_with($notification->message, 'Nouvelle information') || str_starts_with($notification->message, 'Nouvelle réponse') ? 'Voir la discussion' : 'Voir le dossier' }} : {{ $notification->declaration->libelleNotification() }} →
                                 </a>
                             @endif
                         </div>

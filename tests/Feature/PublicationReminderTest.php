@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Jobs\PublishReminder;
 use App\Models\Declaration;
 use App\Models\PublicationReminder;
+use App\Models\Rapprochement;
 use App\Models\User;
 use App\Services\MetaPublishingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -181,6 +182,39 @@ class PublicationReminderTest extends TestCase
             'selection' => 'facebook',
         ])->assertNotFound();
         $this->assertDatabaseCount('publication_reminders', 0);
+    }
+
+    public function test_restitution_notice_is_distinct_and_can_be_retried_without_reposting(): void
+    {
+        Queue::fake();
+        Storage::fake('public');
+        $owner = User::factory()->create();
+        $moderator = User::factory()->create(['role' => 'moderateur']);
+        $loss = $this->publishedDeclaration($owner);
+        $found = User::factory()->create()->declarations()->create([
+            'type' => 'decouverte', 'categorie' => 'objet',
+            'description' => 'Objet déposé au poste.', 'statut' => 'cloturee',
+        ]);
+        Rapprochement::create([
+            'perte_id' => $loss->id, 'decouverte_id' => $found->id, 'statut' => 'restitue',
+        ]);
+        $loss->update(['statut' => 'cloturee']);
+        $notice = PublicationReminder::create([
+            'declaration_id' => $loss->id, 'user_id' => $moderator->id,
+            'kind' => 'restitution', 'channel' => 'facebook', 'status' => 'queued',
+        ]);
+
+        $meta = Mockery::mock(MetaPublishingService::class);
+        $meta->shouldReceive('publishToFacebook')->once()->withArgs(
+            fn ($message, $image) => str_contains($message, 'OBJET RESTITUÉ')
+                && ! str_contains($message, 'RAPPEL') && str_contains($image, 'photos-publiques/sac.jpg')
+        )->andReturn(['success' => true, 'response' => ['id' => 'fb-restitue']]);
+        $meta->shouldReceive('publicPostUrl')->once()->with('facebook', 'fb-restitue')->andReturn(null);
+        (new PublishReminder($notice->id))->handle($meta);
+        $this->assertSame('succeeded', $notice->fresh()->status);
+        $this->assertSame('fb-original', $loss->fresh()->facebook_post_id);
+        $this->actingAs($moderator)->post(route('moderation.reminders.store', $loss), ['selection' => 'facebook'])
+            ->assertNotFound();
     }
 
     private function publishedDeclaration(User $owner): Declaration

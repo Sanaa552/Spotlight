@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use LogicException;
 
 class Declaration extends Model
@@ -30,12 +31,18 @@ class Declaration extends Model
         'publication_error',
         'motif_rejet',
         'cloturee_at',
+        'poste_verifie_nom',
+        'poste_verification_methode',
+        'poste_verification_note',
+        'poste_verifie_at',
+        'poste_verifie_par',
     ];
 
     protected function casts(): array
     {
         return [
             'cloturee_at' => 'datetime',
+            'poste_verifie_at' => 'datetime',
         ];
     }
 
@@ -102,6 +109,19 @@ class Declaration extends Model
         return str_starts_with($this->photo_path ?? '', 'photos-en-attente/');
     }
 
+    public function libelleNotification(): string
+    {
+        $nature = match (true) {
+            $this->type === 'perte' && $this->categorie === 'personne' => 'disparition de personne',
+            $this->type === 'decouverte' && $this->categorie === 'personne' => 'signalement de personne',
+            $this->type === 'decouverte' => "découverte d'objet",
+            default => "perte d'objet",
+        };
+        $precision = Str::limit(Str::squish((string) ($this->type === 'perte' ? $this->type_perte : $this->type_decouverte)), 60, '…');
+
+        return $nature.($precision !== '' ? " «{$precision}»" : '')." (dossier #{$this->id})";
+    }
+
     public function publicationMessage(): string
     {
         $precision = $this->type === 'perte' ? $this->type_perte : $this->type_decouverte;
@@ -113,9 +133,39 @@ class Declaration extends Model
             $this->description,
             'Secteur : '.($this->lieu ?: 'Non précisé'),
             $this->type === 'decouverte' && $this->categorie === 'objet'
-                ? 'Aucune restitution n’est confirmée dans cette annonce. Pour toute information, contactez Spotlight.'
+                ? ($this->depotDocumentaire() && filled($this->poste_verifie_nom)
+                    ? 'Un justificatif indiquant un dépôt auprès de : '.$this->poste_verifie_nom.' a été examiné par Spotlight. La présence actuelle de l’objet au poste n’a pas été confirmée directement. Vérifiez auprès du poste avant tout déplacement. Restitution au propriétaire non confirmée.'
+                    : (filled($this->poste_verifie_nom)
+                    ? 'Objet localisé et déposé auprès de : '.$this->poste_verifie_nom.'. La restitution au propriétaire reste à confirmer. Contactez le poste ou Spotlight pour toute information.'
+                    : 'Objet localisé. Aucune restitution au propriétaire n’est confirmée dans cette annonce. Contactez Spotlight pour toute information.'))
                 : null,
         ]));
+    }
+
+    public function depotDocumentaire(): bool
+    {
+        return $this->poste_verification_methode === 'documentaire';
+    }
+
+    public function aDecouverteDocumentee(): bool
+    {
+        return $this->type === 'perte' && $this->categorie === 'objet'
+            && $this->statut === 'validee'
+            && $this->rapprochementsPerte()->where('statut', 'verifie')
+                ->whereHas('decouverte', fn ($query) => $query->where('statut', 'validee')
+                    ->where('poste_verification_methode', 'documentaire')
+                    ->whereNotNull('poste_verifie_at')->whereNotNull('poste_verifie_nom'))
+                ->exists();
+    }
+
+    public function estLocalisee(): bool
+    {
+        return $this->type === 'perte' && $this->categorie === 'objet'
+            && $this->statut === 'validee'
+            && $this->rapprochementsPerte()->where('statut', 'verifie')
+                ->whereHas('decouverte', fn ($query) => $query->where('statut', 'validee')
+                    ->whereNotNull('poste_verifie_at')->whereNotNull('poste_verifie_nom'))
+                ->exists();
     }
     
         public function commentaires(): HasMany
@@ -172,10 +222,16 @@ class Declaration extends Model
             });
     }
 
-    public static function perteObjetPublique(int $id): ?self
+    public function scopeDisponiblePourCorrespondance($query)
     {
-        return self::publique()->whereKey($id)->where('type', 'perte')
-            ->where('categorie', 'objet')->where('statut', 'validee')->first();
+        return $query->publique()->where('type', 'perte')
+            ->where('categorie', 'objet')->where('statut', 'validee')
+            ->whereDoesntHave('rapprochementsPerte', fn ($rapprochements) => $rapprochements->where('statut', 'verifie'));
+    }
+
+    public static function perteObjetDisponible(int $id): ?self
+    {
+        return self::disponiblePourCorrespondance()->whereKey($id)->first();
     }
 
     public function cloturer(): static

@@ -59,21 +59,24 @@
 
                     <div class="mt-3 flex items-center justify-between gap-2">
                         <a href="{{ route('moderation.declarations.show', $declaration) }}" class="text-xs font-medium text-azur hover:underline">Voir le dossier</a>
+                        @if ($declaration->statut === 'validee')
                         <button type="button" x-on:click="$dispatch('open-modal', 'new-reminder-{{ $declaration->id }}')"
                                 @disabled(count($pendingChannels) === 2)
                                 class="inline-flex shrink-0 items-center gap-1.5 rounded bg-alerte px-3 py-2 text-xs font-semibold text-white hover:bg-alerte-dark disabled:cursor-not-allowed disabled:opacity-50">
                             <x-icon name="refresh-cw" class="h-3.5 w-3.5" />
                             Publier un rappel
                         </button>
+                        @endif
                     </div>
 
                     @if ($declaration->publicationReminders->isNotEmpty())
                         <details class="mt-3 border-t border-gray-100 pt-2">
-                            <summary class="cursor-pointer text-xs font-medium text-gray-600">Historique des rappels ({{ $declaration->publicationReminders->count() }})</summary>
+                            <summary class="cursor-pointer text-xs font-medium text-gray-600">Historique des publications complémentaires ({{ $declaration->publicationReminders->count() }})</summary>
                             <div class="divide-y divide-gray-100">
                                 @foreach ($declaration->publicationReminders as $reminder)
                                     <div class="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-xs text-gray-600">
                                         <span class="font-semibold text-gray-900">{{ ucfirst($reminder->channel) }}</span>
+                                        <span>{{ $reminder->kind === 'restitution' ? 'Avis de restitution' : 'Rappel' }}</span>
                                         <span>{{ $reminder->created_at->format('d/m/Y H:i') }}</span>
                                         <span>{{ $reminder->auteur?->name ?? 'Compte supprimé' }}</span>
                                         <span @class([
@@ -99,7 +102,7 @@
                                             <x-modal name="retry-reminder-{{ $reminder->id }}" maxWidth="md" focusable>
                                                 <form method="POST" action="{{ route('moderation.reminders.retry', $reminder) }}" class="p-6">
                                                     @csrf
-                                                    <h3 class="text-base font-semibold text-gray-900">Relancer ce rappel ?</h3>
+                                                    <h3 class="text-base font-semibold text-gray-900">Relancer {{ $reminder->kind === 'restitution' ? 'cet avis de restitution' : 'ce rappel' }} ?</h3>
                                                     <p class="mt-2 text-sm text-gray-600">Seul {{ ucfirst($reminder->channel) }} sera repris. Une publication déjà confirmée ne sera pas envoyée une seconde fois.</p>
                                                     <div class="mt-5 flex justify-end gap-3">
                                                         <button type="button" x-on:click="$dispatch('close-modal', 'retry-reminder-{{ $reminder->id }}')" class="px-3 py-2 text-sm text-gray-600">Annuler</button>
@@ -122,7 +125,7 @@
                         <h3 class="text-base font-semibold text-gray-900">Publier un rappel pour le dossier #{{ $declaration->id }} ?</h3>
                         <p class="mt-2 text-sm text-gray-600">Choisissez où publier ce nouveau post. Les publications initiales resteront inchangées.</p>
                         <fieldset class="mt-4 divide-y divide-gray-100 border-y border-gray-100">
-                            <legend class="text-sm font-semibold text-gray-900">Réseau du rappel</legend>
+                            <legend class="text-sm font-semibold text-gray-900">Réseau du rappel <span class="text-alerte" aria-hidden="true">*</span><span class="sr-only"> (obligatoire)</span></legend>
                             <label class="flex items-center gap-3 py-3 text-sm text-gray-700 has-[:disabled]:text-gray-400">
                                 <input type="radio" name="selection" required x-model="selection" value="facebook" @disabled(in_array('facebook', $pendingChannels))
                                        class="border-gray-300 text-alerte focus:ring-alerte">

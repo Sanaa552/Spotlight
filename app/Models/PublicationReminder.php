@@ -11,6 +11,7 @@ class PublicationReminder extends Model
         'declaration_id',
         'user_id',
         'channel',
+        'kind',
         'status',
         'post_id',
         'post_url',

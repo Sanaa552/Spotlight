@@ -7,6 +7,8 @@ use App\Models\Declaration;
 use App\Models\PieceJointe;
 use App\Models\User;
 use App\Notifications\ModerationConfirmed;
+use App\Notifications\DeclarationModerated;
+use App\Notifications\ModerationActionRequired;
 use App\Notifications\NewPublicDeclaration;
 use App\Services\MetaPublishingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -191,7 +193,14 @@ class ModerationPublicationTest extends TestCase
             'facebook_post_id' => 'fb-456',
             'instagram_post_id' => null,
         ]);
-        $this->assertDatabaseCount('app_notifications', 0);
+        $this->assertDatabaseHas('app_notifications', [
+            'user_id' => $citizen->id,
+            'declaration_id' => $declaration->id,
+        ]);
+        $this->assertDatabaseHas('app_notifications', [
+            'user_id' => $moderator->id,
+            'declaration_id' => $declaration->id,
+        ]);
 
         $this->actingAs($moderator)
             ->post(route('moderation.valider', $declaration), ['preuves_verifiees' => '1'])
@@ -203,6 +212,10 @@ class ModerationPublicationTest extends TestCase
             'statut' => 'validee',
             'facebook_post_id' => 'fb-456',
             'instagram_post_id' => 'ig-456',
+        ]);
+        $this->assertDatabaseMissing('app_notifications', [
+            'user_id' => $citizen->id,
+            'message' => "La publication de votre déclaration #{$declaration->id} n'a pas abouti. Votre dossier reste suivi par la modération.",
         ]);
     }
 
@@ -401,6 +414,8 @@ class ModerationPublicationTest extends TestCase
         ]);
         Notification::assertSentTo($admin, ModerationConfirmed::class, fn ($notification) => $notification->isPrivate
             && $notification->facebookUrl === null);
+        Notification::assertSentTo($citizen, DeclarationModerated::class,
+            fn ($notification) => $notification->accepted && $notification->declarationId === $declaration->id);
         $this->get(route('dashboard'))->assertDontSee('Dossier personnel confidentiel');
         $this->get(route('public.declarations.index', ['onglet' => 'decouvertes']))
             ->assertDontSee('Dossier personnel confidentiel');
@@ -436,9 +451,20 @@ class ModerationPublicationTest extends TestCase
             ->andReturnUsing(fn ($channel) => "https://example.test/{$channel}-post");
         $this->app->instance(MetaPublishingService::class, $meta);
 
-        $this->actingAs($moderator)->post(route('moderation.valider', $declaration), ['preuves_verifiees' => '1'])
+        $depot = [
+            'preuves_verifiees' => '1', 'depot_verifie' => '1',
+            'poste_verifie_nom' => 'Commissariat de Bonanjo, Douala',
+            'poste_verification_methode' => 'appel',
+            'poste_verification_note' => 'Dépôt confirmé directement auprès du commissariat.',
+        ];
+        $this->actingAs($moderator)->post(route('moderation.valider', $declaration), $depot)
             ->assertSessionHas('warning');
         $this->assertSame('en_attente', $declaration->fresh()->statut);
+
+        $this->actingAs($moderator)->post(route('moderation.valider', $declaration), [
+            ...$depot, 'poste_verification_methode' => 'documentaire',
+        ])->assertSessionHas('warning');
+        $this->assertDatabaseCount('jobs', 0);
 
         Storage::disk('local')->put('declarations-privees/recepisse.pdf', 'receipt');
         $declaration->piecesJointes()->create([
@@ -447,6 +473,10 @@ class ModerationPublicationTest extends TestCase
         ]);
 
         $this->actingAs($moderator)->post(route('moderation.valider', $declaration), ['preuves_verifiees' => '1'])
+            ->assertSessionHasErrors(['depot_verifie', 'poste_verifie_nom', 'poste_verification_methode', 'poste_verification_note']);
+        $this->assertDatabaseCount('jobs', 0);
+
+        $this->actingAs($moderator)->post(route('moderation.valider', $declaration), $depot)
             ->assertSessionHas('success');
         $this->runPublication($declaration, $moderator);
         $this->assertSame('validee', $declaration->fresh()->statut);
@@ -476,12 +506,20 @@ class ModerationPublicationTest extends TestCase
             ]);
         }
 
+        $declaration->localisation()->create(['adresse' => 'Bonanjo, Douala', 'poste_prevu' => 'Commissariat de test (Bonanjo, Douala)']);
+
         $this->actingAs($moderator)->get(route('moderation.index'))
             ->assertOk()->assertSee('Examiner les preuves')
             ->assertDontSee('action="'.route('moderation.valider', $declaration).'"', false);
         $this->get(route('moderation.declarations.show', $declaration))
             ->assertOk()->assertSee('name="preuves_verifiees"', false)
-            ->assertSee('J’ai examiné la vidéo');
+            ->assertSee('J’ai examiné la vidéo')
+            ->assertSee('value="Commissariat de test (Bonanjo, Douala)"', false)
+            ->assertSee('Nom proposé d’après le choix du déclarant');
+
+        $declaration->localisation()->delete();
+        $this->get(route('moderation.declarations.show', $declaration))
+            ->assertOk()->assertSee('Aucun poste n’a été choisi lors de la déclaration');
 
         $this->post(route('moderation.valider', $declaration))
             ->assertSessionHasErrors('preuves_verifiees');
@@ -527,9 +565,11 @@ class ModerationPublicationTest extends TestCase
 
     public function test_facebook_failure_keeps_declaration_pending_and_skips_instagram(): void
     {
+        Notification::fake();
         Storage::fake('public');
         $citizen = User::factory()->create();
         $moderator = User::factory()->create(['role' => 'moderateur']);
+        $admin = User::factory()->create(['role' => 'administrateur']);
         $declaration = $this->declaration($citizen, 'photos-publiques/photo.jpg');
         Storage::disk('public')->put($declaration->photo_path, 'public-photo');
 
@@ -551,6 +591,16 @@ class ModerationPublicationTest extends TestCase
             'facebook_post_id' => null,
             'instagram_post_id' => null,
         ]);
+        foreach ([$citizen, $moderator, $admin] as $recipient) {
+            $this->assertDatabaseHas('app_notifications', [
+                'user_id' => $recipient->id,
+                'declaration_id' => $declaration->id,
+            ]);
+        }
+        Notification::assertSentTo($moderator, ModerationActionRequired::class);
+        Notification::assertSentTo($admin, ModerationActionRequired::class);
+        $this->actingAs($moderator)->get(route('moderation.declarations.show', $declaration))
+            ->assertOk()->assertSee('Publication Facebook non confirmée');
     }
 
     public function test_pending_publication_cannot_be_queued_twice_or_rejected(): void

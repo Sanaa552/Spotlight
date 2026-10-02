@@ -60,7 +60,7 @@
                 <form method="POST" action="{{ route('admin.statistiques.generer') }}" class="flex flex-wrap items-end gap-4">
                     @csrf
                     <div class="flex-1 min-w-[240px]">
-                        <x-input-label for="type" value="Type de statistique" />
+                        <x-input-label for="type" value="Type de statistique" required />
                         <select id="type" name="type" required
                                 class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-alerte focus:ring-alerte">
                             <option value="declarations_par_statut">Déclarations par statut</option>

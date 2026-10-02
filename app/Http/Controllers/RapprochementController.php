@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\PublishReminder;
 use App\Models\Declaration;
+use App\Models\PublicationReminder;
 use App\Models\Rapprochement;
 use App\Services\RapprochementNotifier;
 use Illuminate\Http\RedirectResponse;
@@ -12,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use Throwable;
 
 class RapprochementController extends Controller
 {
@@ -29,8 +32,7 @@ class RapprochementController extends Controller
                 && in_array($decouverte->statut, ['en_attente', 'validee'], true), 403);
         }
 
-        $query = Declaration::publique()->where('type', 'perte')
-            ->where('categorie', 'objet')->where('statut', 'validee');
+        $query = Declaration::disponiblePourCorrespondance();
         if ($term = trim($validated['q'] ?? '')) {
             $query->where(fn ($query) => $query->where('type_perte', 'like', '%'.$term.'%')
                 ->orWhere('description', 'like', '%'.$term.'%')
@@ -68,9 +70,9 @@ class RapprochementController extends Controller
             && in_array($declaration->statut, ['en_attente', 'validee'], true), 403);
 
         $validated = $request->validate(['perte_id' => ['required', 'integer']]);
-        $perte = Declaration::perteObjetPublique($validated['perte_id']);
+        $perte = Declaration::perteObjetDisponible($validated['perte_id']);
         if (! $perte) {
-            return back()->with('warning', 'Cette annonce de perte n’est plus disponible. Cherchez une autre annonce ou laissez la découverte sans correspondance.');
+            return back()->with('warning', 'Cette perte est déjà localisée ou n’est plus disponible pour une correspondance. Cherchez une autre annonce ou laissez la découverte sans correspondance.');
         }
 
         $rapprochement = DB::transaction(function () use ($declaration, $perte) {
@@ -165,7 +167,7 @@ class RapprochementController extends Controller
         return back()->with('success', 'Proposition refusée. La découverte reste suivie séparément.');
     }
 
-    public function confirmer(Request $request, Rapprochement $rapprochement): RedirectResponse
+    public function confirmer(Request $request, Rapprochement $rapprochement, RapprochementNotifier $notifier): RedirectResponse
     {
         $owner = $rapprochement->perte->user_id === $request->user()->id;
         $finder = $rapprochement->decouverte->user_id === $request->user()->id;
@@ -175,42 +177,83 @@ class RapprochementController extends Controller
             return back()->with('warning', 'Attendez la publication des deux déclarations avant de confirmer la remise.');
         }
 
-        $updated = Rapprochement::query()->whereKey($rapprochement->id)->where('statut', 'verifie')->update([
+        $confirmationColumn = $owner ? 'proprietaire_confirme_at' : 'decouvreur_confirme_at';
+        $updated = Rapprochement::query()->whereKey($rapprochement->id)->where('statut', 'verifie')
+            ->whereNull($confirmationColumn)->update([
             $owner ? 'proprietaire_confirme_at' : 'decouvreur_confirme_at' => now(),
         ]);
         if (! $updated) {
-            return back()->with('warning', 'La remise ne peut pas encore être confirmée. Attendez la vérification de la modération.');
+            return back()->with('warning', 'Cette remise a déjà été confirmée ou attend encore la vérification de la modération.');
         }
 
         Log::info('Remise confirmee par declarant Spotlight', ['rapprochement_id' => $rapprochement->id, 'user_id' => $request->user()->id]);
+        if ($owner && $updated) {
+            $notifier->remiseDeclareeParProprietaire($rapprochement);
+        }
 
         return back()->with('success', 'Votre confirmation a été enregistrée. La modération clôturera les dossiers après contrôle.');
     }
 
     public function finaliser(Request $request, Rapprochement $rapprochement, RapprochementNotifier $notifier): RedirectResponse
     {
-        $updated = DB::transaction(function () use ($rapprochement, $request) {
-            $match = Rapprochement::query()->whereKey($rapprochement->id)->lockForUpdate()->firstOrFail();
-            $perte = Declaration::query()->whereKey($match->perte_id)->lockForUpdate()->firstOrFail();
-            $decouverte = Declaration::query()->whereKey($match->decouverte_id)->lockForUpdate()->firstOrFail();
-            if ($match->statut !== 'verifie' || ! $match->proprietaire_confirme_at || ! $match->decouvreur_confirme_at
-                || $perte->statut !== 'validee' || $decouverte->statut !== 'validee') {
-                return false;
-            }
-            $perte->cloturer();
-            $decouverte->cloturer();
-            $match->update(['statut' => 'restitue', 'restitue_at' => now(), 'moderateur_id' => $request->user()->id]);
-            return true;
-        });
+        $validated = $request->validate([
+            'restitution_verifiee' => ['accepted'],
+            'restitution_note' => ['required', 'string', 'min:10', 'max:1000'],
+        ], [
+            'restitution_verifiee.accepted' => 'Confirmez le contrôle de la remise effective avant de clôturer.',
+            'restitution_note.required' => 'Consignez la vérification de la restitution.',
+        ]);
+
+        try {
+            $updated = DB::transaction(function () use ($rapprochement, $request, $validated) {
+                $match = Rapprochement::query()->whereKey($rapprochement->id)->lockForUpdate()->firstOrFail();
+                $perte = Declaration::query()->whereKey($match->perte_id)->lockForUpdate()->firstOrFail();
+                $decouverte = Declaration::query()->whereKey($match->decouverte_id)->lockForUpdate()->firstOrFail();
+                if ($match->statut !== 'verifie' || ! $match->proprietaire_confirme_at
+                    || $perte->type !== 'perte' || $perte->categorie !== 'objet'
+                    || $decouverte->type !== 'decouverte' || $decouverte->categorie !== 'objet'
+                    || $perte->statut !== 'validee' || $decouverte->statut !== 'validee') {
+                    return false;
+                }
+                $perte->cloturer();
+                $decouverte->cloturer();
+                $match->update([
+                    'statut' => 'restitue',
+                    'restitue_at' => now(),
+                    'moderateur_id' => $request->user()->id,
+                    'restitution_note' => $validated['restitution_note'],
+                ]);
+                foreach (['facebook', 'instagram'] as $channel) {
+                    $notice = PublicationReminder::create([
+                        'declaration_id' => $perte->id,
+                        'user_id' => $request->user()->id,
+                        'kind' => 'restitution',
+                        'channel' => $channel,
+                        'status' => 'queued',
+                    ]);
+                    PublishReminder::dispatch($notice->id)->onConnection('database');
+                }
+                return true;
+            });
+        } catch (Throwable $exception) {
+            Log::error('Cloture restitution impossible Spotlight', [
+                'rapprochement_id' => $rapprochement->id,
+                'moderateur_id' => $request->user()->id,
+                'exception' => $exception::class,
+                'message' => $exception->getMessage(),
+            ]);
+
+            return back()->with('warning', 'La restitution n’a pas pu être clôturée. Contactez l’administrateur.');
+        }
 
         if (! $updated) {
-            return back()->with('warning', 'Les deux confirmations et les deux dossiers validés sont nécessaires avant la clôture.');
+            return back()->with('warning', 'La confirmation du propriétaire et les deux dossiers validés sont nécessaires avant la clôture.');
         }
 
         Log::info('Restitution rapprochee finalisee Spotlight', ['rapprochement_id' => $rapprochement->id, 'moderateur_id' => $request->user()->id]);
         $notifier->restitution($rapprochement->fresh(['perte.citoyen', 'decouverte.citoyen']));
 
-        return back()->with('success', 'Restitution confirmée. Les deux dossiers sont déplacés dans les restitutions.');
+        return back()->with('success', 'Restitution confirmée. Les dossiers sont clôturés ; les avis Facebook et Instagram sont en cours de publication.');
     }
 
 }

@@ -28,6 +28,7 @@ class ModerationConfirmed extends Notification implements ShouldQueue
         public bool $isPrivate,
         public ?string $facebookUrl = null,
         public ?string $instagramUrl = null,
+        public ?string $declarationLabel = null,
     ) {}
 
     public function via(object $notifiable): array
@@ -51,6 +52,7 @@ class ModerationConfirmed extends Notification implements ShouldQueue
             $isPrivate,
             $declaration->facebook_post_url,
             $declaration->instagram_post_url,
+            $declaration->libelleNotification(),
         );
 
         User::query()->where('role', Role::Administrateur->value)->each(
@@ -60,17 +62,18 @@ class ModerationConfirmed extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
+        $label = $this->declarationLabel ?? "déclaration #{$this->declarationId}";
         $mail = (new MailMessage)
             ->subject($this->isPrivate
-                ? "Spotlight : signalement privé #{$this->declarationId} vérifié"
-                : "Spotlight : déclaration #{$this->declarationId} publiée")
+                ? "Spotlight : dossier vérifié - {$label}"
+                : "Spotlight : publication confirmée - {$label}")
             ->greeting('Bonjour,')
             ->line($this->isPrivate
-                ? "Le signalement #{$this->declarationId} a été vérifié par la modération. Il reste privé : aucune publication sur les réseaux sociaux."
-                : "La déclaration #{$this->declarationId} a été publiée sur Facebook et Instagram.")
+                ? "Le dossier {$label} a été vérifié par la modération. Il reste privé : aucune publication sur les réseaux sociaux."
+                : "Le dossier {$label} a été publié sur Facebook et Instagram.")
             ->line("Modération : {$this->moderatorName} ({$this->moderatorEmail})")
             ->line("Citoyen : {$this->citizenName} ({$this->citizenEmail})")
-            ->line("Dossier : {$this->type} / {$this->category}")
+            ->line("Dossier : {$label} ({$this->type} / {$this->category})")
             ->line("Résumé : {$this->summary}")
             ->line("Validation : {$this->validatedAt}");
 

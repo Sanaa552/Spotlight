@@ -14,6 +14,8 @@ class RapprochementNotifier
 {
     public function proposition(Rapprochement $rapprochement): void
     {
+        $perte = $rapprochement->perte->libelleNotification();
+        $decouverte = $rapprochement->decouverte->libelleNotification();
         $moderateurs = User::query()
             ->whereIn('role', [Role::Moderateur->value, Role::Administrateur->value])
             ->where('is_blocked', false)->get();
@@ -21,33 +23,82 @@ class RapprochementNotifier
         $this->envoyer(
             $moderateurs,
             $rapprochement->decouverte_id,
-            "Une correspondance a été proposée entre la découverte #{$rapprochement->decouverte_id} et la perte #{$rapprochement->perte_id}. Vérifiez les deux dossiers avant de contacter les déclarants.",
-            'Correspondance à vérifier - Spotlight',
+            "Une correspondance a été proposée entre {$decouverte} (déclarant : {$rapprochement->decouverte->citoyen->name}) et {$perte} (déclarant : {$rapprochement->perte->citoyen->name}). Vérifiez les deux dossiers avant de contacter les déclarants.",
+            "Spotlight : correspondance à vérifier pour {$perte}",
             route('moderation.declarations.show', $rapprochement->decouverte_id),
         );
     }
 
     public function decision(Rapprochement $rapprochement, bool $acceptee): void
     {
+        $perte = $rapprochement->perte->libelleNotification();
+        $decouverte = $rapprochement->decouverte->libelleNotification();
+        if ($acceptee) {
+            $messageProprietaire = "Une découverte pourrait correspondre à votre {$perte}. La modération a comparé les dossiers, mais l'objet n'est pas encore déclaré remis à son propriétaire. Vous recevrez les informations du poste après examen du justificatif ou confirmation directe du dépôt et publication de la découverte. Ne confirmez la restitution qu'après avoir récupéré l'objet.";
+            $messageDecouvreur = "La modération a vérifié une correspondance possible pour votre {$decouverte}. Cela ne confirme pas une restitution. La publication attend encore le contrôle du dépôt auprès du poste ; conservez le récépissé.";
+            $this->envoyer(collect([$rapprochement->perte->citoyen]), $rapprochement->perte_id,
+                $messageProprietaire, "Spotlight : correspondance possible pour {$perte}", null, $rapprochement);
+            if ($rapprochement->decouverte->user_id !== $rapprochement->perte->user_id) {
+                $this->envoyer(collect([$rapprochement->decouverte->citoyen]), $rapprochement->decouverte_id,
+                    $messageDecouvreur, "Spotlight : correspondance vérifiée pour {$decouverte}", null, $rapprochement);
+            }
+
+            return;
+        }
+
         $this->envoyer(
-            collect([$rapprochement->decouverte->citoyen, ...($acceptee ? [$rapprochement->perte->citoyen] : [])])->unique('id'),
+            collect([$rapprochement->decouverte->citoyen]),
             $rapprochement->decouverte_id,
-            $acceptee
-                ? "La modération a vérifié une correspondance possible entre les dossiers #{$rapprochement->perte_id} et #{$rapprochement->decouverte_id}. Cela ne confirme pas une restitution. Attendez la validation des deux dossiers, organisez la remise avec les autorités, puis confirmez-la seulement après qu'elle a réellement eu lieu."
-                : "La correspondance proposée pour votre découverte #{$rapprochement->decouverte_id} n'a pas été retenue. Votre déclaration reste suivie séparément.",
-            $acceptee ? 'Correspondance vérifiée - Spotlight' : 'Correspondance non retenue - Spotlight',
+            "La correspondance proposée pour votre {$decouverte} n'a pas été retenue. Votre déclaration reste suivie séparément.",
+            "Spotlight : correspondance non retenue pour {$decouverte}",
             null,
             $rapprochement,
         );
     }
 
+    public function depotConfirme(Rapprochement $rapprochement): void
+    {
+        $perte = $rapprochement->perte->libelleNotification();
+        $poste = $rapprochement->decouverte->poste_verifie_nom;
+        $documentaire = $rapprochement->decouverte->depotDocumentaire();
+        $this->envoyer(
+            collect([$rapprochement->perte->citoyen]),
+            $rapprochement->perte_id,
+            $documentaire
+                ? "La découverte liée à votre {$perte} a été publiée après examen d'un justificatif mentionnant : {$poste}. Spotlight n'a pas confirmé directement que ce poste détient encore l'objet. Contactez le poste avant de vous déplacer avec vos justificatifs. La restitution n'est pas confirmée ; confirmez-la dans Spotlight seulement après avoir récupéré l'objet."
+                : "La découverte liée à votre {$perte} a été vérifiée et publiée. L'objet est signalé auprès de : {$poste}. Rapprochez-vous de ce poste avec vos justificatifs. Il est localisé, mais sa restitution n'est pas encore confirmée. Confirmez dans Spotlight seulement après l'avoir récupéré.",
+            $documentaire ? "Spotlight : justificatif de dépôt examiné - {$perte}" : "Spotlight : votre objet est localisé - {$perte}",
+            null,
+            $rapprochement,
+        );
+    }
+
+    public function remiseDeclareeParProprietaire(Rapprochement $rapprochement): void
+    {
+        $perte = $rapprochement->perte->libelleNotification();
+        $decouverte = $rapprochement->decouverte->libelleNotification();
+        $moderateurs = User::query()
+            ->whereIn('role', [Role::Moderateur->value, Role::Administrateur->value])
+            ->where('is_blocked', false)->get();
+
+        $this->envoyer(
+            $moderateurs,
+            $rapprochement->decouverte_id,
+            "Le propriétaire de {$perte} confirme avoir récupéré l'objet lié à {$decouverte}. Contrôlez la remise effective avant de clôturer et de publier un avis de restitution.",
+            "Spotlight : remise à contrôler pour {$perte}",
+            route('moderation.declarations.show', $rapprochement->decouverte_id),
+        );
+    }
+
     public function restitution(Rapprochement $rapprochement): void
     {
+        $perte = $rapprochement->perte->libelleNotification();
+        $decouverte = $rapprochement->decouverte->libelleNotification();
         $this->envoyer(
             collect([$rapprochement->perte->citoyen, $rapprochement->decouverte->citoyen])->unique('id'),
             $rapprochement->decouverte_id,
-            "La restitution liée aux dossiers #{$rapprochement->perte_id} et #{$rapprochement->decouverte_id} a été confirmée par la modération. Ces dossiers figurent désormais dans les restitutions.",
-            'Restitution confirmée - Spotlight',
+            "La remise de l'objet lié à {$perte} et {$decouverte} a été confirmée par la modération. Ces dossiers figurent désormais dans les restitutions ; les avis Facebook et Instagram sont en cours d'envoi.",
+            "Spotlight : restitution confirmée pour {$perte}",
             null,
             $rapprochement,
         );

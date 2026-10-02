@@ -7,6 +7,8 @@ use App\Jobs\PublishDeclaration;
 use App\Models\Declaration;
 use App\Models\User;
 use App\Notifications\ModerationConfirmed;
+use App\Notifications\DeclarationModerated;
+use App\Notifications\DiscoveryProofRequested;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -29,13 +31,72 @@ class ModerateurController extends Controller
         return view('moderation.index', compact('declarations'));
     }
 
+    public function demanderJustificatif(Request $request, Declaration $declaration): RedirectResponse
+    {
+        $declaration->loadMissing('citoyen');
+        if ($declaration->type !== 'decouverte' || $declaration->statut !== 'en_attente') {
+            return back()->with('warning', 'Cette demande concerne uniquement une découverte encore en attente.');
+        }
+
+        if ($declaration->piecesJointes()->where('type_document', 'preuve_signalement')->exists()) {
+            return back()->with('warning', 'Le justificatif est déjà joint au dossier. Actualisez la page.');
+        }
+
+        $key = 'demande-justificatif-declaration-'.$declaration->id;
+        if (! Cache::add($key, true, now()->addDay())) {
+            return back()->with('warning', 'Une demande a déjà été envoyée pour ce dossier aujourd’hui.');
+        }
+
+        try {
+            $label = $declaration->libelleNotification();
+            AppNotification::create([
+                'user_id' => $declaration->user_id,
+                'declaration_id' => $declaration->id,
+                'message' => "La modération demande le justificatif des autorités pour {$label}. Ajoutez-le depuis votre dossier ; il restera privé.",
+                'date_envoi' => now(),
+                'canal' => 'app',
+            ]);
+            $declaration->citoyen->notify(new DiscoveryProofRequested(
+                $declaration->id,
+                $label,
+                $declaration->categorie === 'objet',
+            ));
+
+            Log::info('Demande justificatif decouverte Spotlight', [
+                'declaration_id' => $declaration->id,
+                'moderateur_id' => $request->user()->id,
+                'citoyen_id' => $declaration->user_id,
+            ]);
+
+            return back()->with('success', 'Demande enregistrée : notification Spotlight disponible et email mis en file d’envoi. Le dossier reste en attente.');
+        } catch (Throwable $exception) {
+            Log::error('Demande justificatif decouverte impossible Spotlight', [
+                'declaration_id' => $declaration->id,
+                'moderateur_id' => $request->user()->id,
+                'exception' => $exception::class,
+                'message' => $exception->getMessage(),
+            ]);
+
+            return back()->with('warning', 'L’envoi de la demande n’a pas pu être confirmé. Contactez l’administrateur.');
+        }
+    }
+
     /** Valider une déclaration */
     public function valider(Request $request, Declaration $declaration): RedirectResponse
     {
-        $request->validate([
+        $objectDiscovery = $declaration->type === 'decouverte' && $declaration->categorie === 'objet';
+        $validated = $request->validate([
             'preuves_verifiees' => ['accepted'],
+            'depot_verifie' => [$objectDiscovery ? 'accepted' : 'nullable'],
+            'poste_verifie_nom' => [$objectDiscovery ? 'required' : 'nullable', 'string', 'max:255'],
+            'poste_verification_methode' => [$objectDiscovery ? 'required' : 'nullable', 'in:documentaire,appel,visite'],
+            'poste_verification_note' => [$objectDiscovery ? 'required' : 'nullable', 'string', 'min:10', 'max:1000'],
         ], [
             'preuves_verifiees.accepted' => 'Examinez les preuves du dossier et confirmez leur contrôle avant de valider.',
+            'depot_verifie.accepted' => 'Attestez le contrôle réellement effectué avant toute publication.',
+            'poste_verifie_nom.required' => 'Indiquez le poste mentionné sur le justificatif ou confirmé directement.',
+            'poste_verification_methode.required' => 'Indiquez comment le dépôt a été contrôlé.',
+            'poste_verification_note.required' => 'Consignez le contrôle effectué et ses limites.',
         ]);
 
         $startedAt = microtime(true);
@@ -102,7 +163,8 @@ class ModerateurController extends Controller
                 $declaration->confirmerSignalement();
                 $declaration->update(['moderateur_id' => $moderateur->id]);
                 try {
-                    $this->notifierCitoyen($declaration, "Votre signalement #{$declaration->id} a été vérifié. Il reste privé.");
+                    $this->notifierCitoyen($declaration, "Le dossier {$declaration->libelleNotification()} a été vérifié. Il reste privé.");
+                    $declaration->citoyen->notify(new DeclarationModerated($declaration->id, true, declarationLabel: $declaration->libelleNotification()));
                     ModerationConfirmed::sendFor($declaration, $moderateur, true);
                 } catch (Throwable $exception) {
                     Log::error('Notification signalement personne impossible Spotlight', [
@@ -139,7 +201,7 @@ class ModerateurController extends Controller
                 'elapsed_ms' => (int) ((microtime(true) - $startedAt) * 1000),
             ]);
 
-            $queued = DB::transaction(function () use ($declaration, $moderateur) {
+            $queued = DB::transaction(function () use ($declaration, $moderateur, $objectDiscovery, $validated) {
                 $dossier = Declaration::query()->whereKey($declaration->id)->lockForUpdate()->firstOrFail();
                 if ($dossier->statut !== 'en_attente' || ! in_array($dossier->publication_status, [null, 'failed'], true)) {
                     return 'busy';
@@ -153,6 +215,13 @@ class ModerateurController extends Controller
                     'publication_status' => 'queued',
                     'publication_error' => null,
                     'moderateur_id' => $moderateur->id,
+                    ...($objectDiscovery ? [
+                        'poste_verifie_nom' => $validated['poste_verifie_nom'],
+                        'poste_verification_methode' => $validated['poste_verification_methode'],
+                        'poste_verification_note' => $validated['poste_verification_note'],
+                        'poste_verifie_at' => now(),
+                        'poste_verifie_par' => $moderateur->id,
+                    ] : []),
                 ]);
                 PublishDeclaration::dispatch($declaration->id, $moderateur->id)->onConnection('database');
 
@@ -219,10 +288,19 @@ class ModerateurController extends Controller
             return back()->with('warning', 'Publication en cours : impossible de rejeter ce dossier maintenant.');
         }
 
-        $this->notifierCitoyen(
-            $declaration,
-            "Votre déclaration #{$declaration->id} a été rejetée : {$validated['motif_rejet']}"
-        );
+        try {
+            $this->notifierCitoyen(
+                $declaration,
+                "Le dossier {$declaration->libelleNotification()} a été rejeté : {$validated['motif_rejet']}"
+            );
+            $declaration->citoyen->notify(new DeclarationModerated($declaration->id, false, $validated['motif_rejet'], $declaration->libelleNotification()));
+        } catch (Throwable $exception) {
+            Log::error('Notification refus declaration impossible Spotlight', [
+                'declaration_id' => $declaration->id,
+                'exception' => $exception::class,
+                'message' => $exception->getMessage(),
+            ]);
+        }
 
         Log::info('Declaration rejetee Spotlight', [
             'declaration_id' => $declaration->id,

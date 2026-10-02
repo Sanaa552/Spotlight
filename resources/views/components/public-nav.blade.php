@@ -1,11 +1,11 @@
 <header class="border-b border-white/10 bg-nuit fixed top-0 inset-x-0 z-40">
-    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-2">
         <a href="/" class="flex items-center gap-2">
             <x-spotlight-icon class="h-9 w-9" />
-            <x-spotlight-wordmark size="text-xl" />
+            <x-spotlight-wordmark size="hidden sm:inline text-xl" />
         </a>
 
-        <nav class="hidden sm:flex items-center gap-6">
+        <nav class="hidden lg:flex items-center gap-6">
             <a href="/" class="text-sm {{ request()->is('/') ? 'text-argent font-semibold' : 'text-argent/60 hover:text-argent' }} transition">
                 Accueil
             </a>
@@ -20,18 +20,19 @@
             </a>
         </nav>
 
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-1 sm:gap-3">
+            <x-theme-toggle />
             @auth
                 <a href="{{ route('dashboard') }}"
                    class="inline-flex items-center px-5 py-2 bg-alerte border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-alerte-dark transition">
                     Tableau de bord
                 </a>
             @else
-                <a href="{{ route('login') }}" class="text-sm font-medium text-argent/70 hover:text-argent transition">
+                <a href="{{ route('login') }}" class="text-xs sm:text-sm font-medium text-argent/70 hover:text-argent transition">
                     Se connecter
                 </a>
                 <a href="{{ route('register') }}"
-                   class="inline-flex items-center px-5 py-2 bg-alerte border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-alerte-dark transition">
+                   class="inline-flex items-center px-2 sm:px-5 py-2 bg-alerte border border-transparent rounded-md font-semibold text-[11px] sm:text-xs text-white uppercase tracking-widest hover:bg-alerte-dark transition">
                     Créer un compte
                 </a>
             @endauth

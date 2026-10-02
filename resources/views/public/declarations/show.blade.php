@@ -6,6 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Déclaration #{{ $declaration->id }} - {{ config('app.name', 'Spotlight') }}</title>
     <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
+    <x-theme-init />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="font-sans antialiased bg-nuit text-argent">
@@ -21,6 +22,12 @@
                 <span>{{ $declaration->created_at->diffForHumans() }}</span>
                 @if ($declaration->statut === 'cloturee')
                     <span class="text-sonar">Restituée</span>
+                @elseif ($declaration->type === 'perte' && $declaration->aDecouverteDocumentee())
+                    <span class="text-sonar">Dépôt documenté, non restitué</span>
+                @elseif ($declaration->type === 'perte' && $declaration->estLocalisee())
+                    <span class="text-sonar">Localisé, non restitué</span>
+                @elseif ($declaration->type === 'decouverte' && $declaration->categorie === 'objet' && $declaration->poste_verifie_at && $declaration->poste_verifie_nom)
+                    <span class="text-sonar">{{ $declaration->depotDocumentaire() ? 'Dépôt documenté, restitution en attente' : 'Déposé, restitution en attente' }}</span>
                 @endif
             </div>
             <h1 class="mt-3 text-2xl font-semibold sm:text-3xl">{{ $declaration->type_perte ?? $declaration->type_decouverte ?? ucfirst($declaration->categorie) }}</h1>
@@ -32,7 +39,17 @@
                      class="mt-6 max-h-[560px] w-full bg-white/5 object-contain">
             @endif
             <p class="mt-6 whitespace-pre-line text-sm leading-7 text-argent/90">{{ $declaration->description }}</p>
-            @if ($declaration->type === 'perte' && $declaration->categorie === 'objet' && $declaration->statut === 'validee')
+            @if ($declaration->type === 'decouverte' && $declaration->categorie === 'objet' && $declaration->poste_verifie_at && $declaration->poste_verifie_nom)
+                @if ($declaration->depotDocumentaire())
+                    <p class="mt-4 text-sm font-medium text-sonar">Un justificatif mentionnant {{ $declaration->poste_verifie_nom }} a été examiné. La présence actuelle de l’objet n’a pas été confirmée directement auprès du poste. Vérifiez avant de vous déplacer. La remise au propriétaire n’est pas confirmée.</p>
+                @else
+                    <p class="mt-4 text-sm font-medium text-sonar">Dépôt confirmé auprès de : {{ $declaration->poste_verifie_nom }}. La remise au propriétaire n’est pas encore confirmée.</p>
+                @endif
+            @endif
+            @if ($declaration->type === 'perte' && $declaration->estLocalisee())
+                <p class="mt-4 text-sm text-argent/80">Une découverte correspondante a été vérifiée. Le propriétaire doit confirmer la récupération ; l’objet n’est pas encore marqué comme restitué.</p>
+            @endif
+            @if ($declaration->type === 'perte' && $declaration->categorie === 'objet' && $declaration->statut === 'validee' && \App\Models\Declaration::perteObjetDisponible($declaration->id))
                 <a href="{{ route('declarations.create', ['perte_id' => $declaration->id]) }}"
                    class="mt-5 inline-flex rounded-md bg-sonar px-4 py-2 text-sm font-semibold text-white hover:bg-sonar-dark">J’ai retrouvé cet objet</a>
             @endif
@@ -86,7 +103,7 @@
                             <span>Réponse à <span x-text="replyName"></span></span>
                             <button type="button" x-on:click="replyTo = ''; replyName = ''" class="text-argent/60 hover:text-argent">Annuler</button>
                         </div>
-                        <label for="comment-input" class="block text-sm font-medium">Partager une information</label>
+                        <label for="comment-input" class="block text-sm font-medium">Partager une information <span class="text-alerte" aria-hidden="true">*</span><span class="sr-only"> (obligatoire)</span></label>
                         <textarea id="comment-input" name="contenu" required maxlength="1000" rows="3" x-ref="commentInput"
                                   class="w-full rounded-md border-white/20 bg-white text-gray-900 focus:border-azur focus:ring-azur"></textarea>
                         <button type="submit" class="rounded-md bg-alerte px-5 py-2 text-sm font-semibold text-white hover:bg-alerte-dark">Publier</button>

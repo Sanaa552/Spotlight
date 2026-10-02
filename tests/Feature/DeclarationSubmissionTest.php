@@ -6,12 +6,14 @@ use App\Models\Declaration;
 use App\Models\Localisation;
 use App\Models\PieceJointe;
 use App\Models\User;
+use App\Notifications\ModerationActionRequired;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 class DeclarationSubmissionTest extends TestCase
@@ -20,9 +22,13 @@ class DeclarationSubmissionTest extends TestCase
 
     public function test_citizen_can_submit_a_declaration_with_a_valid_attachment(): void
     {
+        Notification::fake();
         Storage::fake('public');
         Storage::fake('local');
         $citizen = User::factory()->create();
+        $moderator = User::factory()->create(['role' => 'moderateur']);
+        $admin = User::factory()->create(['role' => 'administrateur']);
+        $blockedModerator = User::factory()->create(['role' => 'moderateur', 'is_blocked' => true]);
 
         $response = $this->actingAs($citizen)->post(route('declarations.store'), [
             'type' => 'perte',
@@ -54,6 +60,18 @@ class DeclarationSubmissionTest extends TestCase
         $this->assertNotNull(Declaration::firstOrFail()->photo_path);
         Storage::disk('local')->assertExists(Declaration::firstOrFail()->photo_path);
         Storage::disk('public')->assertMissing(Declaration::firstOrFail()->photo_path);
+        foreach ([$moderator, $admin] as $recipient) {
+            $this->assertDatabaseHas('app_notifications', [
+                'user_id' => $recipient->id,
+                'declaration_id' => Declaration::firstOrFail()->id,
+            ]);
+            Notification::assertSentTo($recipient, ModerationActionRequired::class,
+                fn ($notification) => str_contains($notification->subject, 'Portefeuille perdu')
+                    && str_contains($notification->subject, '(dossier #'.Declaration::firstOrFail()->id.')')
+                    && str_contains($notification->message, $citizen->name));
+        }
+        Notification::assertNotSentTo($blockedModerator, ModerationActionRequired::class);
+        Notification::assertNotSentTo($citizen, ModerationActionRequired::class);
     }
 
     public function test_json_submission_returns_validation_errors_without_creating_a_declaration(): void
@@ -349,9 +367,12 @@ class DeclarationSubmissionTest extends TestCase
 
     public function test_discovered_object_can_add_authority_receipt_after_private_submission(): void
     {
+        Notification::fake();
         Storage::fake('public');
         Storage::fake('local');
         $citizen = User::factory()->create();
+        $moderator = User::factory()->create(['role' => 'moderateur']);
+        $admin = User::factory()->create(['role' => 'administrateur']);
         $data = [
             'type' => 'decouverte',
             'categorie' => 'objet',
@@ -389,6 +410,12 @@ class DeclarationSubmissionTest extends TestCase
         $this->actingAs($citizen)->post(route('declarations.preuve-signalement.store', $declaration), [
             'preuve_signalement' => UploadedFile::fake()->create('recepisse.pdf', 1024, 'application/pdf'),
         ])->assertSessionHas('success');
+
+        foreach ([$moderator, $admin] as $recipient) {
+            Notification::assertSentTo($recipient, ModerationActionRequired::class,
+                fn ($notification) => str_contains($notification->subject, 'justificatif ajouté'));
+            $this->assertSame(2, $recipient->appNotifications()->where('declaration_id', $declaration->id)->count());
+        }
 
         foreach (['preuve_decouverte', 'preuve_signalement'] as $type) {
             $piece = $declaration->piecesJointes()->where('type_document', $type)->firstOrFail();
@@ -432,7 +459,7 @@ class DeclarationSubmissionTest extends TestCase
             ->assertOk()
             ->assertSee('value="Poste de test (Douala)"', false)
             ->assertSee("type: 'decouverte'", false)
-            ->assertSee('Son choix ne remplace pas le récépissé des autorités');
+            ->assertSee('La remise réelle devra être justifiée et le poste sera vérifié par la modération avant publication.');
 
         $this->actingAs($citizen)->get(route('declarations.create'))
             ->assertOk()

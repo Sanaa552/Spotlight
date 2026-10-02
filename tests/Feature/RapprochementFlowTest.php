@@ -44,7 +44,11 @@ class RapprochementFlowTest extends TestCase
             ->assertSessionHasNoErrors();
         $found = Declaration::query()->where('type', 'decouverte')->firstOrFail();
         $this->assertDatabaseHas('rapprochements', ['perte_id' => $loss->id, 'decouverte_id' => $found->id, 'statut' => 'propose']);
-        Notification::assertSentTo($moderator, RapprochementUpdate::class);
+        Notification::assertSentTo($moderator, RapprochementUpdate::class,
+            fn ($notification) => str_contains($notification->subject, 'Sac rouge')
+                && str_contains($notification->message, 'Sac trouvé')
+                && str_contains($notification->message, $owner->name)
+                && str_contains($notification->message, $finder->name));
         Notification::assertNotSentTo($owner, RapprochementUpdate::class);
 
         $this->actingAs($finder)->post(route('declarations.store'), [
@@ -56,7 +60,7 @@ class RapprochementFlowTest extends TestCase
         $this->assertDatabaseCount('rapprochements', 1);
     }
 
-    public function test_both_declarants_and_moderator_are_required_for_matched_restitution(): void
+    public function test_owner_confirmation_and_moderator_review_finalize_without_finder_approval(): void
     {
         Notification::fake();
         $owner = User::factory()->create();
@@ -69,17 +73,29 @@ class RapprochementFlowTest extends TestCase
         $this->actingAs($finder)->post(route('moderation.rapprochements.verifier', $match))->assertForbidden();
         $this->actingAs($moderator)->post(route('moderation.rapprochements.verifier', $match), ['correspondance_verifiee' => '1'])->assertSessionHas('success');
         $this->assertSame('verifie', $match->fresh()->statut);
-        Notification::assertSentTo($owner, RapprochementUpdate::class);
-        Notification::assertSentTo($finder, RapprochementUpdate::class);
+        Notification::assertSentTo($owner, RapprochementUpdate::class,
+            fn ($notification) => str_contains($notification->subject, 'Sac rouge')
+                && str_contains($notification->message, "(dossier #{$loss->id})"));
+        Notification::assertSentTo($finder, RapprochementUpdate::class,
+            fn ($notification) => str_contains($notification->subject, 'Sac trouvé')
+                && str_contains($notification->message, "(dossier #{$found->id})"));
 
         $this->actingAs($owner)->post(route('declarations.confirmer-restitution', $loss))->assertSessionHas('warning');
+        $review = ['restitution_verifiee' => '1', 'restitution_note' => 'Remise contrôlée auprès du poste identifié.'];
+        $this->actingAs($moderator)->post(route('moderation.rapprochements.finaliser', $match), $review)->assertSessionHas('warning');
         $this->actingAs($owner)->post(route('rapprochements.confirmer', $match))->assertSessionHas('success');
-        $this->actingAs($moderator)->post(route('moderation.rapprochements.finaliser', $match))->assertSessionHas('warning');
-        $this->actingAs($finder)->post(route('rapprochements.confirmer', $match))->assertSessionHas('success');
-        $this->actingAs($moderator)->post(route('moderation.rapprochements.finaliser', $match))->assertSessionHas('success');
+        Notification::assertSentTo($moderator, RapprochementUpdate::class,
+            fn ($notification) => str_contains($notification->message, 'confirme avoir récupéré'));
+        $this->actingAs($moderator)->post(route('moderation.rapprochements.finaliser', $match), $review)->assertSessionHas('success');
 
         $this->assertSame('cloturee', $loss->fresh()->statut);
         $this->assertSame('cloturee', $found->fresh()->statut);
+        $this->assertNull($match->fresh()->decouvreur_confirme_at);
+        $this->assertDatabaseHas('rapprochements', ['id' => $match->id, 'statut' => 'restitue', 'restitution_note' => $review['restitution_note']]);
+        $this->assertDatabaseHas('publication_reminders', ['declaration_id' => $loss->id, 'kind' => 'restitution', 'channel' => 'facebook', 'status' => 'queued']);
+        $this->assertDatabaseHas('publication_reminders', ['declaration_id' => $loss->id, 'kind' => 'restitution', 'channel' => 'instagram', 'status' => 'queued']);
+        $this->actingAs($moderator)->post(route('moderation.rapprochements.finaliser', $match), $review)->assertSessionHas('warning');
+        $this->assertDatabaseCount('publication_reminders', 2);
         $this->actingAs($owner)->get(route('dashboard'))->assertDontSee('Sac rouge');
         $this->get(route('public.declarations.index', ['onglet' => 'restitutions']))->assertSee('Sac rouge');
     }
@@ -101,6 +117,60 @@ class RapprochementFlowTest extends TestCase
         $this->get(route('public.declarations.show', $person))->assertNotFound();
     }
 
+    public function test_localized_loss_stays_public_but_cannot_be_selected_again(): void
+    {
+        Notification::fake();
+        Storage::fake('local');
+        Storage::fake('public');
+        $owner = User::factory()->create();
+        $finder = User::factory()->create();
+        $otherFinder = User::factory()->create();
+        $loss = $this->loss($owner);
+        $found = $this->found($finder);
+        $found->update([
+            'poste_verifie_nom' => 'Commissariat de Bonanjo, Douala',
+            'poste_verifie_at' => now(),
+        ]);
+        $match = Rapprochement::create([
+            'perte_id' => $loss->id, 'decouverte_id' => $found->id, 'statut' => 'propose',
+        ]);
+
+        $this->actingAs($otherFinder)->get(route('rapprochements.pertes', ['format' => 'json']))
+            ->assertOk()->assertJsonCount(1, 'pertes');
+        $match->update(['statut' => 'verifie']);
+
+        $this->get(route('rapprochements.pertes', ['format' => 'json']))
+            ->assertOk()->assertJsonCount(0, 'pertes');
+        $this->get(route('declarations.create', ['perte_id' => $loss->id]))
+            ->assertOk()->assertSee('Aucune annonce choisie');
+        $this->get(route('public.declarations.show', $loss))
+            ->assertOk()->assertSee('Localisé, non restitué')->assertDontSee('J’ai retrouvé cet objet');
+        $this->get(route('dashboard'))
+            ->assertOk()->assertSee('Découvertes')->assertSee('Restitutions')->assertSee('Sac trouvé');
+        $this->get(route('public.declarations.index', ['onglet' => 'decouvertes']))
+            ->assertOk()->assertSee('Sac trouvé');
+
+        $anotherDiscovery = $this->found($otherFinder);
+        $this->post(route('rapprochements.proposer', $anotherDiscovery), ['perte_id' => $loss->id])
+            ->assertSessionHas('warning');
+        $this->post(route('declarations.store'), [
+            'type' => 'decouverte', 'categorie' => 'objet', 'type_decouverte' => 'Autre sac trouvé',
+            'description' => 'Sac trouvé dans la rue.', 'adresse' => 'Douala', 'perte_id' => $loss->id,
+            'photo_publique' => UploadedFile::fake()->create('sac.jpg', 100, 'image/jpeg'),
+            'preuve_decouverte' => UploadedFile::fake()->create('lieu.mp4', 100, 'video/mp4'),
+        ])->assertSessionHasErrors('perte_id');
+        $this->assertDatabaseCount('rapprochements', 1);
+
+        $loss->update(['statut' => 'cloturee']);
+        $found->update(['statut' => 'cloturee']);
+        $match->update(['statut' => 'restitue']);
+        $this->get(route('public.declarations.index', ['onglet' => 'restitutions']))
+            ->assertOk()->assertSee('Sac rouge')->assertSee('Sac trouvé');
+        $this->get(route('public.declarations.index', ['onglet' => 'decouvertes']))
+            ->assertOk()->assertDontSee(route('public.declarations.show', $found), false);
+        $this->get(route('public.declarations.show', $loss))->assertOk();
+    }
+
     public function test_linked_discovery_is_reviewed_before_publication_and_handover_waits(): void
     {
         Notification::fake();
@@ -115,7 +185,7 @@ class RapprochementFlowTest extends TestCase
 
         $this->actingAs($moderator)->get(route('moderation.declarations.show', $found))
             ->assertOk()->assertSee('Vérifiez ou refusez d’abord la correspondance');
-        $this->post(route('moderation.valider', $found), ['preuves_verifiees' => '1'])
+        $this->post(route('moderation.valider', $found), $this->verifiedDepot())
             ->assertSessionHas('warning');
         $this->assertDatabaseCount('jobs', 0);
         $this->assertNull($found->fresh()->publication_status);
@@ -125,8 +195,10 @@ class RapprochementFlowTest extends TestCase
             ->assertSessionHas('success');
         $this->assertSame('verifie', $match->fresh()->statut);
         $this->actingAs($finder)->post(route('rapprochements.confirmer', $match))->assertSessionHas('warning');
-        $this->actingAs($moderator)->post(route('moderation.rapprochements.finaliser', $match))->assertSessionHas('warning');
-        $this->post(route('moderation.valider', $found), ['preuves_verifiees' => '1'])
+        $this->actingAs($moderator)->post(route('moderation.rapprochements.finaliser', $match), [
+            'restitution_verifiee' => '1', 'restitution_note' => 'Aucune remise confirmée pour le moment.',
+        ])->assertSessionHas('warning');
+        $this->post(route('moderation.valider', $found), $this->verifiedDepot())
             ->assertSessionHas('success');
         $this->assertSame('queued', $found->fresh()->publication_status);
         $this->assertDatabaseCount('jobs', 1);
@@ -146,6 +218,67 @@ class RapprochementFlowTest extends TestCase
         $this->assertSame('succeeded', $found->fresh()->publication_status);
         $this->assertSame('validee', $loss->fresh()->statut);
         $this->assertSame('verifie', $match->fresh()->statut);
+        $this->assertSame('Commissariat de Bonanjo, Douala', $found->fresh()->poste_verifie_nom);
+        Notification::assertSentTo($owner, RapprochementUpdate::class,
+            fn ($notification) => str_contains($notification->message, 'Commissariat de Bonanjo'));
+        $this->get(route('public.declarations.show', $loss))->assertSee('Localisé, non restitué');
+    }
+
+    public function test_documentary_review_publishes_with_cautious_wording_and_notifies_owner(): void
+    {
+        Notification::fake();
+        Storage::fake('local');
+        Storage::fake('public');
+        $owner = User::factory()->create();
+        $finder = User::factory()->create();
+        $moderator = User::factory()->create(['role' => 'moderateur']);
+        $loss = $this->loss($owner);
+        $found = $this->pendingFound($finder);
+        $match = Rapprochement::create(['perte_id' => $loss->id, 'decouverte_id' => $found->id]);
+
+        $this->actingAs($moderator)->post(route('moderation.rapprochements.verifier', $match), ['correspondance_verifiee' => '1'])
+            ->assertSessionHas('success');
+        $this->get(route('moderation.declarations.show', $found))
+            ->assertOk()->assertSee('Examen du justificatif transmis');
+        $review = [
+            'preuves_verifiees' => '1',
+            'depot_verifie' => '1',
+            'poste_verifie_nom' => 'Commissariat de Bonanjo, Douala',
+            'poste_verification_methode' => 'documentaire',
+            'poste_verification_note' => 'Récépissé du 2 octobre examiné ; poste et date cohérents, présence actuelle non vérifiée.',
+        ];
+        $this->post(route('moderation.valider', $found), $review)->assertSessionHas('success');
+        $this->assertSame('documentaire', $found->fresh()->poste_verification_methode);
+
+        $meta = \Mockery::mock(MetaPublishingService::class);
+        $meta->shouldReceive('publishToFacebook')->once()
+            ->withArgs(fn ($message, $imageUrl) => str_contains($message, 'justificatif indiquant un dépôt')
+                && str_contains($message, 'pas été confirmée directement')
+                && ! str_contains($message, 'Objet localisé et déposé')
+                && filled($imageUrl))
+            ->andReturn(['success' => true, 'response' => ['id' => 'fb-document']]);
+        $meta->shouldReceive('facebookPhotoUrl')->once()->with('fb-document')
+            ->andReturn(['success' => true, 'url' => 'https://scontent.example.test/trouve.jpg']);
+        $meta->shouldReceive('publishToInstagram')->once()
+            ->withArgs(fn ($imageUrl, $caption) => str_contains($caption, 'justificatif indiquant un dépôt')
+                && str_contains($caption, 'pas été confirmée directement'))
+            ->andReturn(['success' => true, 'response' => ['id' => 'ig-document']]);
+        $meta->shouldReceive('publicPostUrl')->twice()
+            ->andReturnUsing(fn ($channel) => "https://example.test/{$channel}-post");
+        (new PublishDeclaration($found->id, $moderator->id))->handle($meta);
+
+        $this->assertSame('validee', $found->fresh()->statut);
+        $this->assertTrue($loss->fresh()->aDecouverteDocumentee());
+        Notification::assertSentTo($owner, RapprochementUpdate::class,
+            fn ($notification) => str_contains($notification->message, "n'a pas confirmé directement"));
+        $this->actingAs($owner)->get(route('declarations.show', $loss))
+            ->assertOk()->assertSee('Poste indiqué sur le justificatif')
+            ->assertSee('Confirmer que j’ai récupéré mon objet');
+        $this->get(route('public.declarations.show', $loss))
+            ->assertOk()->assertSee('Dépôt documenté, non restitué');
+        $this->get(route('public.declarations.show', $found))
+            ->assertOk()->assertSee('La présence actuelle de l’objet n’a pas été confirmée directement')
+            ->assertDontSee('Dépôt confirmé auprès de');
     }
 
     public function test_rejected_match_allows_independent_discovery_publication(): void
@@ -160,7 +293,7 @@ class RapprochementFlowTest extends TestCase
 
         $this->actingAs($moderator)->post(route('moderation.rapprochements.rejeter', $match))
             ->assertSessionHas('success');
-        $this->post(route('moderation.valider', $found), ['preuves_verifiees' => '1'])
+        $this->post(route('moderation.valider', $found), $this->verifiedDepot())
             ->assertSessionHas('success');
         $this->assertSame('rejete', $match->fresh()->statut);
         $this->assertSame('queued', $found->fresh()->publication_status);
@@ -176,7 +309,7 @@ class RapprochementFlowTest extends TestCase
         $found = $this->pendingFound($finder);
         $moderator = User::factory()->create(['role' => 'moderateur']);
 
-        $this->actingAs($moderator)->post(route('moderation.valider', $found), ['preuves_verifiees' => '1'])
+        $this->actingAs($moderator)->post(route('moderation.valider', $found), $this->verifiedDepot())
             ->assertSessionHas('success');
         $this->actingAs($finder)->post(route('rapprochements.proposer', $found), ['perte_id' => $loss->id])
             ->assertSessionHas('warning');
@@ -221,6 +354,17 @@ class RapprochementFlowTest extends TestCase
         }
 
         return $found;
+    }
+
+    private function verifiedDepot(): array
+    {
+        return [
+            'preuves_verifiees' => '1',
+            'depot_verifie' => '1',
+            'poste_verifie_nom' => 'Commissariat de Bonanjo, Douala',
+            'poste_verification_methode' => 'appel',
+            'poste_verification_note' => 'Dépôt confirmé auprès du poste de Bonanjo.',
+        ];
     }
 
     private function loss(User $owner): Declaration

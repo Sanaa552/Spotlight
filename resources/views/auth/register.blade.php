@@ -19,27 +19,27 @@
 
         <!-- Name -->
         <div class="w-full">
-            <x-input-label for="name" :value="__('Nom')" />
+            <x-input-label for="name" :value="__('Nom')" required />
             <x-text-input id="name" class="block mt-1 w-full" type="text" name="name" :value="old('name')" required autofocus autocomplete="name" />
             <x-input-error :messages="$errors->get('name')" class="mt-2" />
         </div>
 
         <!-- Email Address -->
         <div class="w-full">
-            <x-input-label for="email" :value="__('Email')" />
+            <x-input-label for="email" :value="__('Email')" required />
             <x-text-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email')" required autocomplete="username" />
             <x-input-error :messages="$errors->get('email')" class="mt-2" />
         </div>
                 <!-- Téléphone -->
         <div class="w-full">
-            <x-input-label for="telephone" :value="__('Téléphone')" />
+            <x-input-label for="telephone" :value="__('Téléphone (facultatif)')" />
             <x-text-input id="telephone" class="block mt-1 w-full" type="tel" name="telephone" :value="old('telephone')" autocomplete="tel" placeholder="+237 6XX XX XX XX" />
             <x-input-error :messages="$errors->get('telephone')" class="mt-2" />
         </div>
 
        <!-- Password -->
         <div class="w-full">
-            <x-input-label for="password" :value="__('Mot de passe')" />
+            <x-input-label for="password" :value="__('Mot de passe')" required />
 
             <div class="relative">
                 <x-text-input id="password"
@@ -73,7 +73,7 @@
 
        <!-- Confirm Password -->
 <div class="w-full">
-    <x-input-label for="password_confirmation" :value="__('Confirmer le mot de passe')" />
+    <x-input-label for="password_confirmation" :value="__('Confirmer le mot de passe')" required />
 
     <div class="relative">
         <x-text-input id="password_confirmation"

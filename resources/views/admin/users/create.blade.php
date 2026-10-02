@@ -12,7 +12,7 @@
 
     <div class="py-12">
         <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6 md:p-8">
+            <div class="spotlight-form-panel bg-white overflow-hidden border border-transparent shadow-sm sm:rounded-lg p-6 md:p-8">
                 @if ($errors->any())
                     <div class="mb-6 bg-alerte/10 border border-alerte/30 text-alerte-dark px-4 py-3 rounded-lg">
                         <ul class="list-disc list-inside text-sm space-y-1">
@@ -27,22 +27,22 @@
                     @csrf
 
                     <div>
-                        <x-input-label for="name" value="Nom" />
+                        <x-input-label for="name" value="Nom" required />
                         <x-text-input id="name" name="name" type="text" class="mt-1 block w-full" :value="old('name')" required autofocus />
                     </div>
 
                     <div>
-                        <x-input-label for="email" value="Email" />
+                        <x-input-label for="email" value="Email" required />
                         <x-text-input id="email" name="email" type="email" class="mt-1 block w-full" :value="old('email')" required />
                     </div>
 
                     <div>
-                        <x-input-label for="telephone" value="Téléphone" />
+                        <x-input-label for="telephone" value="Téléphone (facultatif)" />
                         <x-text-input id="telephone" name="telephone" type="tel" class="mt-1 block w-full" :value="old('telephone')" />
                     </div>
 
                     <div>
-                        <x-input-label for="role" value="Rôle" />
+                        <x-input-label for="role" value="Rôle" required />
                         <select id="role" name="role" required
                                 class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-alerte focus:ring-alerte">
                             <option value="citoyen" {{ old('role') === 'citoyen' ? 'selected' : '' }}>Citoyen</option>
@@ -55,12 +55,13 @@
                         <div>
                             <x-input-label for="password" value="Mot de passe provisoire" />
                             <x-text-input id="password" name="password" type="password" class="mt-1 block w-full" autocomplete="new-password" />
-                            <p class="mt-1 text-xs text-gray-400">Laissez vide pour envoyer un lien de réinitialisation.</p>
+                            <p class="mt-1 text-xs text-gray-500">Facultatif : laissez vide pour que la personne reçoive un lien lui permettant de choisir son mot de passe.</p>
                         </div>
 
                         <div>
-                            <x-input-label for="password_confirmation" value="Confirmer" />
+                            <x-input-label for="password_confirmation" value="Confirmer le mot de passe provisoire" />
                             <x-text-input id="password_confirmation" name="password_confirmation" type="password" class="mt-1 block w-full" autocomplete="new-password" />
+                            <p class="mt-1 text-xs text-gray-500">À remplir uniquement si vous avez saisi un mot de passe provisoire.</p>
                         </div>
                     </div>
 

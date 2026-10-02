@@ -11,7 +11,7 @@
         <form method="GET" action="{{ $declaration ? route('declarations.commissariats', $declaration) : route('commissariats.rechercher') }}"
               class="flex flex-col gap-3 bg-white p-4 sm:flex-row sm:items-end">
             <div class="min-w-0 flex-1">
-                <label for="ville" class="block text-sm font-medium text-gray-800">Ville de recherche</label>
+                <label for="ville" class="block text-sm font-medium text-gray-800">Ville de recherche <span class="text-alerte" aria-hidden="true">*</span><span class="sr-only"> (obligatoire)</span></label>
                 <select id="ville" name="ville" required class="mt-1 w-full rounded-md border-gray-300 text-sm focus:border-azur focus:ring-azur">
                     <option value="">Choisir une ville</option>
                     @foreach ($villes as $option)

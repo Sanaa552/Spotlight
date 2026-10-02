@@ -7,7 +7,7 @@
 
     <div class="py-12">
         <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6 md:p-8">
+            <div class="spotlight-form-panel bg-white overflow-hidden border border-transparent shadow-sm sm:rounded-lg p-6 md:p-8">
 
                 @if ($errors->any())
                     <div class="mb-6 bg-alerte/10 border border-alerte/30 text-alerte-dark px-4 py-3 rounded-lg">
@@ -105,6 +105,8 @@
                       class="space-y-6">
                     @csrf
 
+                    <p class="text-xs text-gray-600"><span class="font-semibold text-alerte" aria-hidden="true">*</span> Champs obligatoires selon le type de déclaration choisi.</p>
+
                     <div x-show="submitErrors.length" x-cloak x-ref="submitErrors" role="alert"
                          class="border border-alerte/30 bg-alerte/10 px-4 py-3 text-sm text-alerte-dark">
                         <p class="font-semibold">La déclaration n’a pas été envoyée.</p>
@@ -118,25 +120,25 @@
                     </div>
 
                     {{-- Type de déclaration --}}
-                    <div>
-                        <x-input-label value="Type de déclaration" />
+                    <fieldset>
+                        <legend class="block text-sm font-medium text-gray-700">Type de déclaration <span class="text-alerte" aria-hidden="true">*</span><span class="sr-only"> (obligatoire)</span></legend>
                         <div class="mt-2 grid grid-cols-2 gap-4">
                             <label class="flex items-center gap-2 border rounded-lg p-4 cursor-pointer transition"
                                    :class="type === 'perte' ? 'border-alerte ring-1 ring-alerte bg-alerte/5' : 'border-gray-300'">
-                                <input type="radio" name="type" value="perte" x-model="type" class="text-alerte focus:ring-alerte">
+                                <input type="radio" name="type" value="perte" x-model="type" required class="text-alerte focus:ring-alerte">
                                 <span>Déclarer une perte</span>
                             </label>
                             <label class="flex items-center gap-2 border rounded-lg p-4 cursor-pointer transition"
                                    :class="type === 'decouverte' ? 'border-sonar ring-1 ring-sonar bg-sonar/5' : 'border-gray-300'">
-                                <input type="radio" name="type" value="decouverte" x-model="type" class="text-sonar focus:ring-sonar">
+                                <input type="radio" name="type" value="decouverte" x-model="type" required class="text-sonar focus:ring-sonar">
                                 <span> Déclarer une découverte</span>
                             </label>
                         </div>
-                    </div>
+                    </fieldset>
 
                     {{-- Catégorie --}}
                     <div>
-                        <x-input-label for="categorie" value="Personne ou objet concerné" />
+                        <x-input-label for="categorie" value="Personne ou objet concerné" required />
                         <select id="categorie" name="categorie" required x-model="categorie"
                                 class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-alerte focus:ring-alerte">
                             <option value="">-- Sélectionner --</option>
@@ -150,7 +152,7 @@
                     </div>
 
                     <div x-show="type === 'decouverte'" x-cloak class="border-l-4 border-sonar bg-sonar/5 px-4 py-3 text-sm text-gray-700">
-                        <span x-show="categorie === 'personne'">Si une personne, notamment un enfant, est en danger, contactez immédiatement la <a href="tel:117" class="font-semibold underline">Police au 117</a> ou la <a href="tel:113" class="font-semibold underline">Gendarmerie au 113</a>. Ne la filmez pas et ne publiez pas sa position. Ce dossier restera privé.</span>
+                        <span x-show="categorie === 'personne'">Si une personne, notamment un enfant, est en danger, contactez immédiatement la <a href="tel:117" class="font-semibold underline">Police au 117</a> ou la <a href="tel:113" class="font-semibold underline">Gendarmerie au 113</a>. Ne la filmez pas et ne publiez pas sa position. Ce dossier restera privé ; aucune photo publique n'est demandée.</span>
                         <span x-show="categorie !== 'personne'">Filmez l’objet et le lieu si cela ne présente aucun danger, puis remettez l’objet à un poste de police ou de gendarmerie. Vous pourrez ajouter le récépissé après avoir enregistré ce dossier privé.</span>
                         <button x-show="categorie === 'objet'" type="button" x-on:click="$dispatch('open-modal', 'station-picker')"
                                 class="mt-2 inline-flex items-center gap-2 font-semibold text-azur hover:underline">
@@ -159,13 +161,13 @@
                     </div>
 
                     <div x-show="type === 'decouverte' && categorie === 'objet'" x-cloak>
-                        <x-input-label for="poste_prevu" value="Poste où vous prévoyez de remettre l’objet (facultatif)" />
+                        <x-input-label for="poste_prevu" value="Poste envisagé pour la remise (facultatif)" />
                         <x-text-input id="poste_prevu" name="poste_prevu" type="text" class="mt-1 block w-full"
                                       :value="old('poste_prevu', $posteInitial)" maxlength="255"
                                       x-bind:disabled="type !== 'decouverte' || categorie !== 'objet'" />
                         <input id="poste_latitude" name="poste_latitude" type="hidden" value="{{ old('poste_latitude') }}" x-bind:disabled="type !== 'decouverte' || categorie !== 'objet'">
                         <input id="poste_longitude" name="poste_longitude" type="hidden" value="{{ old('poste_longitude') }}" x-bind:disabled="type !== 'decouverte' || categorie !== 'objet'">
-                        <p id="poste-selection-status" role="status" aria-live="polite" class="mt-1 text-xs text-gray-500">Ce poste est distinct du lieu de découverte. Son choix ne remplace pas le récépissé des autorités.</p>
+                        <p id="poste-selection-status" role="status" aria-live="polite" class="mt-1 text-xs text-gray-500">Vous pouvez soumettre sans avoir choisi de poste. Après la remise, ajoutez le justificatif des autorités : il doit permettre d’identifier le poste. Le modérateur le vérifiera avant toute publication.</p>
                         <x-input-error :messages="$errors->get('poste_prevu')" class="mt-2" />
                     </div>
 
@@ -191,13 +193,14 @@
 
                     {{-- Type perte (si perte) --}}
                     <div x-show="type === 'perte'" x-cloak>
-                        <x-input-label for="type_perte" value="Quel objet ou quelle personne recherchez-vous ?" />
+                        <x-input-label for="type_perte" value="Quel objet ou quelle personne recherchez-vous ?" required />
                         <x-text-input id="type_perte" name="type_perte" type="text" class="mt-1 block w-full"
-                                      :value="old('type_perte')" placeholder="Ex. portefeuille noir, enfant disparu" />
+                                      :value="old('type_perte')" placeholder="Ex. portefeuille noir, enfant disparu"
+                                      x-bind:disabled="type !== 'perte'" x-bind:required="type === 'perte'" />
                     </div>
 
                     <div x-show="type === 'perte'" x-cloak>
-                        <x-input-label for="declaration_perte" value="Preuve du signalement aux autorités" />
+                        <x-input-label for="declaration_perte" value="Preuve du signalement aux autorités" required />
                         <input id="declaration_perte" name="declaration_perte" type="file"
                                accept=".jpg,.jpeg,.png,.pdf"
                                x-ref="lossReport"
@@ -206,46 +209,49 @@
                                x-on:change="validateFiles($event)"
                                class="mt-1 block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-alerte/10 file:text-alerte-dark hover:file:bg-alerte/20" />
                         <p class="mt-1 text-xs text-gray-500">
-                            Récépissé, procès-verbal ou autre document remis par les autorités. Pour un objet, attestation de perte si applicable. 10 Mo maximum. Document privé.
+                            Document remis par la police ou la gendarmerie après votre signalement : récépissé, procès-verbal ou attestation. Il permet à la modération de vérifier la perte, reste privé et n'est jamais publié. JPG, PNG ou PDF, 10 Mo maximum.
                         </p>
                     </div>
 
                     {{-- Type découverte (si découverte) --}}
                     <div x-show="type === 'decouverte'" x-cloak>
-                        <x-input-label for="type_decouverte" value="Qu’avez-vous trouvé ou signalé ?" />
+                        <x-input-label for="type_decouverte" value="Qu’avez-vous trouvé ou signalé ?" required />
                         <x-text-input id="type_decouverte" name="type_decouverte" type="text" class="mt-1 block w-full"
-                                      :value="old('type_decouverte')" placeholder="Ex. trousseau de clés, personne à protéger" />
+                                      :value="old('type_decouverte')" placeholder="Ex. trousseau de clés, personne à protéger"
+                                      x-bind:disabled="type !== 'decouverte'" x-bind:required="type === 'decouverte'" />
+                        <p class="mt-1 text-xs text-gray-500">Décrivez brièvement ce que vous avez réellement trouvé, même si vous avez sélectionné une perte Spotlight. La correspondance doit encore être vérifiée.</p>
                     </div>
 
                     <div x-show="type === 'decouverte' && categorie === 'objet'" x-cloak>
-                        <x-input-label for="preuve_decouverte" value="Vidéo privée de l’objet et du lieu de découverte" />
+                        <x-input-label for="preuve_decouverte" value="Vidéo privée de l’objet et du lieu de découverte" required />
                         <input id="preuve_decouverte" name="preuve_decouverte" type="file" accept=".mp4,.mov,.webm,video/mp4,video/quicktime,video/webm"
                                x-ref="discoveryVideo" x-bind:disabled="type !== 'decouverte' || categorie !== 'objet'"
                                x-bind:required="type === 'decouverte' && categorie === 'objet'"
                                x-on:change="validateFiles($event)"
                                class="mt-1 block w-full text-sm text-gray-600" />
-                        <p class="mt-1 text-xs text-gray-500">MP4, MOV ou WebM, 30 Mo maximum. Ne filmez pas de personne identifiable. Cette vidéo reste privée.</p>
+                        <p class="mt-1 text-xs text-gray-500">Filmez brièvement l'objet et l'endroit où vous l'avez trouvé pour aider la modération à vérifier la découverte. Ne filmez pas de personne identifiable. Cette vidéo reste privée et n'est pas publiée. MP4, MOV ou WebM, 30 Mo maximum.</p>
                     </div>
 
                     <div x-show="type === 'decouverte'" x-cloak>
-                        <x-input-label for="preuve_signalement" value="Justificatif de remise ou de signalement aux autorités" />
+                        <x-input-label for="preuve_signalement" value="Justificatif remis par les autorités (facultatif à cette étape)" />
                         <input id="preuve_signalement" name="preuve_signalement" type="file" accept=".jpg,.jpeg,.png,.pdf"
                                x-ref="authorityProof" x-bind:disabled="type !== 'decouverte'"
                                x-on:change="validateFiles($event)"
                                class="mt-1 block w-full text-sm text-gray-600" />
-                        <p class="mt-1 text-xs text-gray-500">Récépissé ou autre preuve délivrée par le poste, JPG, PNG ou PDF, 10 Mo maximum. Vous pourrez l'ajouter plus tard ; aucune validation ou publication n'est possible avant.</p>
+                        <p class="mt-1 text-xs text-gray-500">Si vous ne l'avez pas encore, soumettez le dossier puis ouvrez Mes déclarations &gt; votre dossier &gt; Ajouter le justificatif. Cette possibilité reste ouverte tant que le dossier est en attente. Aucune validation ni publication avant son ajout. Document privé : JPG, PNG ou PDF, 10 Mo maximum.</p>
                     </div>
 
                     {{-- Description --}}
                     <div>
-                        <x-input-label for="description" value="Description" />
+                        <x-input-label for="description" value="Description" required />
                         <textarea id="description" name="description" rows="4" required
                                   class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-alerte focus:ring-alerte">{{ old('description') }}</textarea>
+                        <p class="mt-1 text-xs text-gray-500">Décrivez les faits et les signes utiles pour reconnaître la personne ou l'objet. Ce texte pourra être publié, sauf pour une personne découverte dont le dossier reste privé.</p>
                     </div>
 
                     {{-- Lieu (résumé texte) --}}
                     <div>
-                        <x-input-label for="lieu" value="Quartier et ville de la perte ou de la découverte" />
+                        <x-input-label for="lieu" value="Quartier et ville de la perte ou de la découverte (facultatif)" />
                         <x-text-input id="lieu" name="lieu" type="text" class="mt-1 block w-full" :value="old('lieu')" />
                         <p class="mt-1 text-xs text-gray-500">Quartier et ville uniquement : ce texte pourra être publié. Ne saisissez pas d'adresse privée.</p>
                     </div>
@@ -256,16 +262,17 @@
 
                         <div class="space-y-4">
                             <div>
-                                <x-input-label for="adresse" value="Adresse ou repère du lieu de l’événement" />
+                                <x-input-label for="adresse" value="Adresse ou repère du lieu de l’événement" required />
                                 <x-text-input id="adresse" name="adresse" type="text" required
                                               class="mt-1 block w-full" :value="old('adresse')" />
+                                <p class="mt-1 text-xs text-gray-500">Indiquez où la perte ou la découverte a eu lieu, pas le poste où l'objet sera remis.</p>
                             </div>
 
                         </div>
                     </fieldset>
 
                     <div x-show="!(type === 'decouverte' && categorie === 'personne')" x-cloak>
-                        <x-input-label for="photo_publique" value="Photo publique de la personne ou de l’objet" />
+                        <x-input-label for="photo_publique" value="Photo principale de la personne ou de l’objet (publique)" required />
                         <input id="photo_publique" name="photo_publique" type="file"
                                accept=".jpg,.jpeg,.png,image/jpeg,image/png"
                                x-ref="publicPhoto"
@@ -273,17 +280,17 @@
                                x-bind:required="!(type === 'decouverte' && categorie === 'personne')"
                                x-on:change="validateFiles($event)"
                                class="mt-1 block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-sonar/10 file:text-sonar-dark hover:file:bg-sonar/20" />
-                        <p class="mt-1 text-xs text-gray-500">JPG, JPEG ou PNG, 10 Mo maximum. Cette photo sera visible dans Spotlight et utilisée pour Facebook et Instagram.</p>
+                        <p class="mt-1 text-xs text-gray-500">Photographiez la personne recherchée ou l'objet concerné. Pour un objet découvert, ajoutez sa photo même s'il n'a jamais été déclaré perdu sur Spotlight. C'est l'image de l'annonce visible sur Spotlight, Facebook et Instagram ; n'y mettez ni document d'identité ni justificatif. JPG ou PNG, 10 Mo maximum.</p>
                     </div>
 
                     <div>
-                        <x-input-label for="pieces_jointes" value="Justificatifs privés (5 max, 10 Mo chacun)" />
+                        <x-input-label for="pieces_jointes" value="Autres justificatifs privés (facultatifs)" />
                         <input id="pieces_jointes" name="pieces_jointes[]" type="file" multiple
                                accept=".jpg,.jpeg,.png,.pdf"
                                x-ref="attachments"
                                x-on:change="validateFiles($event)"
                                class="mt-1 block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-azur/10 file:text-azur hover:file:bg-azur/20" />
-                        <p class="mt-1 text-xs text-gray-500">Autres justificatifs : JPG, JPEG, PNG ou PDF. Visibles uniquement par vous et la modération. Taille totale maximale, vidéo comprise : 60 Mo.</p>
+                        <p class="mt-1 text-xs text-gray-500">Ajoutez seulement les documents utiles à la vérification, par exemple facture, CNI ou preuve de propriété. Ils sont visibles uniquement par vous et la modération, jamais sur les réseaux sociaux. Jusqu'à 5 fichiers JPG, PNG ou PDF de 10 Mo chacun ; ensemble des fichiers limité à 60 Mo.</p>
                         <p x-show="fileError" x-text="fileError" class="mt-2 text-sm font-medium text-alerte" style="display:none"></p>
                     </div>
 
@@ -318,7 +325,7 @@
             </div>
             <div class="mt-5 flex flex-wrap items-end gap-2">
                 <div class="min-w-0 flex-1">
-                    <label for="station-city" class="block text-sm font-medium text-gray-700">Ville</label>
+                    <label for="station-city" class="block text-sm font-medium text-gray-700">Ville <span class="text-alerte" aria-hidden="true">*</span><span class="sr-only"> (obligatoire pour la recherche)</span></label>
                     <select id="station-city" x-model="city" class="mt-1 w-full rounded-md border-gray-300 text-sm">
                         <option value="">Choisir une ville</option>
                         @foreach ($villes as $option)<option value="{{ $option }}">{{ $option }}</option>@endforeach

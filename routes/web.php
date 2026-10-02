@@ -94,6 +94,8 @@ Route::middleware(['auth', 'verified', 'not_blocked', 'role:moderateur,administr
     Route::get('/declarations/{declaration}', [DeclarationController::class, 'show'])
         ->name('declarations.show');
     Route::post('/{declaration}/valider', [ModerateurController::class, 'valider'])->name('valider');
+    Route::post('/{declaration}/demander-justificatif', [ModerateurController::class, 'demanderJustificatif'])
+        ->middleware('throttle:5,1')->name('demander-justificatif');
     Route::post('/{declaration}/rejeter', [ModerateurController::class, 'rejeter'])->name('rejeter');
     Route::post('/utilisateurs/{user}/bloquer', [ModerateurController::class, 'bloquerUtilisateur'])->name('bloquer');
 });

@@ -36,14 +36,22 @@ class PublishReminder implements ShouldQueue
         $reminder = PublicationReminder::findOrFail($this->reminderId);
         try {
             $declaration = Declaration::findOrFail($reminder->declaration_id);
-            if (! in_array($declaration->statut, ['validee', 'cloturee'], true)
+            $restitution = $reminder->kind === 'restitution';
+            $eligible = $restitution
+                ? $declaration->type === 'perte' && $declaration->categorie === 'objet'
+                    && $declaration->statut === 'cloturee'
+                    && $declaration->rapprochementsPerte()->where('statut', 'restitue')->exists()
+                : $declaration->statut === 'validee';
+            if (! $eligible
                 || ! Declaration::publique()->whereKey($declaration->id)->exists()
                 || ! Storage::disk('public')->exists($declaration->photo_path)) {
                 throw new RuntimeException('La déclaration ou sa photo publique ne sont plus disponibles.');
             }
 
             if (! $reminder->post_id) {
-                $message = "RAPPEL\n\n".$declaration->publicationMessage();
+                $message = $restitution
+                    ? "SPOTLIGHT - OBJET RESTITUÉ\n\nL'objet de la déclaration de perte #{$declaration->id} ({$declaration->type_perte}) a été remis à son propriétaire. La restitution a été confirmée par la modération. Ce dossier est clôturé."
+                    : "RAPPEL\n\n".$declaration->publicationMessage();
                 if ($reminder->channel === 'facebook') {
                     $result = $meta->publishToFacebook($message, $declaration->photoUrl());
                 } else {
@@ -55,9 +63,10 @@ class PublishReminder implements ShouldQueue
 
                 $postId = $result['response']['id'] ?? null;
                 if (! ($result['success'] ?? false) || ! $postId) {
-                    Log::warning('Rappel Meta non confirme Spotlight', [
+                    Log::warning('Publication secondaire Meta non confirmee Spotlight', [
                         'reminder_id' => $reminder->id,
                         'declaration_id' => $declaration->id,
+                        'kind' => $reminder->kind,
                         'channel' => $reminder->channel,
                         'result' => $result,
                     ]);
@@ -65,7 +74,7 @@ class PublishReminder implements ShouldQueue
                         'status' => 'failed',
                         'error' => ($result['response']['error']['code'] ?? null) === 190
                             ? 'Connexion Meta expirée. Demandez à l’administrateur de renouveler le jeton.'
-                            : 'Meta n’a pas confirmé le rappel. Vérifiez les journaux avant de réessayer.',
+                            : 'Meta n’a pas confirmé la publication. Vérifiez les journaux avant de réessayer.',
                     ]);
 
                     return;
@@ -79,24 +88,26 @@ class PublishReminder implements ShouldQueue
                 'post_url' => $url,
                 'error' => null,
             ]);
-            Log::info('Rappel Meta publie Spotlight', [
+            Log::info('Publication secondaire Meta confirmee Spotlight', [
                 'reminder_id' => $reminder->id,
                 'declaration_id' => $declaration->id,
+                'kind' => $reminder->kind,
                 'channel' => $reminder->channel,
                 'post_id' => $reminder->post_id,
                 'has_url' => filled($url),
             ]);
         } catch (Throwable $exception) {
-            Log::error('Echec technique rappel Meta Spotlight', [
+            Log::error('Echec technique publication complementaire Meta Spotlight', [
                 'reminder_id' => $reminder->id,
                 'declaration_id' => $reminder->declaration_id,
+                'kind' => $reminder->kind,
                 'channel' => $reminder->channel,
                 'exception' => $exception::class,
                 'message' => $exception->getMessage(),
             ]);
             $reminder->update([
                 'status' => 'failed',
-                'error' => 'Le rappel n’a pas abouti. Contactez l’administrateur si le problème persiste.',
+                'error' => 'La publication n’a pas abouti. Contactez l’administrateur si le problème persiste.',
             ]);
         }
     }
@@ -107,7 +118,7 @@ class PublishReminder implements ShouldQueue
             ->whereIn('status', ['queued', 'processing'])
             ->update([
                 'status' => 'failed',
-                'error' => 'Le traitement du rappel a été interrompu. Vérifiez les journaux.',
+                'error' => 'Le traitement de la publication a été interrompu. Vérifiez les journaux.',
             ]);
         Log::error('Job rappel Meta interrompu Spotlight', [
             'reminder_id' => $this->reminderId,

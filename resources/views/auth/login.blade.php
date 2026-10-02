@@ -22,7 +22,7 @@
         
         <!-- Email Address -->
         <div class="w-full">
-            <x-input-label for="email" :value="__('Email')" />
+            <x-input-label for="email" :value="__('Email')" required />
             <x-text-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email')" required autofocus autocomplete="username" />
             <x-input-error :messages="$errors->get('email')" class="mt-2" />
         </div>
@@ -30,7 +30,7 @@
         
 <!-- Password -->
 <div class="w-full">
-    <x-input-label for="password" :value="__('Mot de passe')" />
+    <x-input-label for="password" :value="__('Mot de passe')" required />
 
     <div class="relative">
         <x-text-input id="password"

@@ -1,6 +1,6 @@
 Bonjour {{ $notifiable->name }},
 
-Votre déclaration #{{ $declarationId }} est confirmée sur Facebook, Instagram et Spotlight.
+Le dossier {{ $declarationLabel }} est confirmé sur Facebook, Instagram et Spotlight.
 
 Votre dossier : {{ $declarationUrl }}
 @if ($facebookUrl)

@@ -9,7 +9,7 @@ class Rapprochement extends Model
 {
     protected $fillable = [
         'perte_id', 'decouverte_id', 'moderateur_id', 'statut', 'verifie_at',
-        'proprietaire_confirme_at', 'decouvreur_confirme_at', 'restitue_at',
+        'proprietaire_confirme_at', 'decouvreur_confirme_at', 'restitue_at', 'restitution_note',
     ];
 
     protected function casts(): array

@@ -15,7 +15,7 @@ export default {
                 sans: ['Figtree', ...defaultTheme.fontFamily.sans],
             },
             colors: {
-                nuit: '#02040C',
+                nuit: 'rgb(var(--color-nuit) / <alpha-value>)',
                 azur: {
                     DEFAULT: '#12579B',
                     dark: '#0B3A68',
@@ -28,7 +28,7 @@ export default {
                     DEFAULT: '#FDC105',
                     dark: '#8A6600',
                 },
-                argent: '#D8DCE3',
+                argent: 'rgb(var(--color-argent) / <alpha-value>)',
                 sonar: {
                     DEFAULT: '#12877F',
                     dark: '#0B5F59',

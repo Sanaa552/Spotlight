@@ -53,6 +53,7 @@ class PublicationReminderController extends Controller
                     $reminder = PublicationReminder::create([
                         'declaration_id' => $declaration->id,
                         'user_id' => $request->user()->id,
+                        'kind' => 'rappel',
                         'channel' => $channel,
                         'status' => 'queued',
                     ]);
@@ -83,7 +84,9 @@ class PublicationReminderController extends Controller
 
     public function retry(Request $request, PublicationReminder $reminder): RedirectResponse
     {
-        abort_unless($this->canRemind($reminder->declaration), 404);
+        abort_unless($reminder->kind === 'restitution'
+            ? $this->canRetryRestitution($reminder->declaration)
+            : $this->canRemind($reminder->declaration), 404);
         $lock = Cache::lock('rappel-declaration-'.$reminder->declaration_id, 30);
         if (! $lock->get()) {
             return back()->with('warning', 'Un rappel de ce dossier est déjà en préparation.');
@@ -129,7 +132,17 @@ class PublicationReminderController extends Controller
 
     private function canRemind(Declaration $declaration): bool
     {
-        return in_array($declaration->statut, ['validee', 'cloturee'], true)
+        return $declaration->statut === 'validee'
+            && Declaration::publique()->whereKey($declaration->id)->exists()
+            && filled($declaration->photo_path)
+            && Storage::disk('public')->exists($declaration->photo_path);
+    }
+
+    private function canRetryRestitution(Declaration $declaration): bool
+    {
+        return $declaration->type === 'perte' && $declaration->categorie === 'objet'
+            && $declaration->statut === 'cloturee'
+            && $declaration->rapprochementsPerte()->where('statut', 'restitue')->exists()
             && Declaration::publique()->whereKey($declaration->id)->exists()
             && filled($declaration->photo_path)
             && Storage::disk('public')->exists($declaration->photo_path);

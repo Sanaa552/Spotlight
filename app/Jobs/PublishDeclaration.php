@@ -8,6 +8,8 @@ use App\Models\User;
 use App\Notifications\DeclarationPublished;
 use App\Notifications\ModerationConfirmed;
 use App\Services\MetaPublishingService;
+use App\Services\ModerationInboxNotifier;
+use App\Services\RapprochementNotifier;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -53,13 +55,16 @@ class PublishDeclaration implements ShouldQueue
         try {
             if ($declaration->type === 'decouverte' && $declaration->categorie === 'objet'
                 && $declaration->rapprochementDecouverte()->where('statut', 'propose')->exists()) {
-                $declaration->update([
-                    'publication_status' => 'failed',
-                    'publication_error' => 'Correspondance avec une perte non vérifiée. Demandez à la modération de la vérifier ou de la refuser avant de relancer.',
-                ]);
                 Log::warning('Publication bloquee par correspondance non verifiee Spotlight', [
                     'declaration_id' => $declaration->id,
                 ]);
+                $this->marquerEchec($declaration, 'correspondance');
+                return;
+            }
+
+            if ($declaration->type === 'decouverte' && $declaration->categorie === 'objet'
+                && (! $declaration->poste_verifie_at || blank($declaration->poste_verifie_nom))) {
+                $this->marquerEchec($declaration, 'poste');
                 return;
             }
 
@@ -147,13 +152,14 @@ class PublishDeclaration implements ShouldQueue
                 AppNotification::query()
                     ->where('declaration_id', $declaration->id)
                     ->where('user_id', $declaration->user_id)
-                    ->where('message', 'like', 'La publication de votre déclaration%')
+                    ->where('message', 'like', "La publication de% n'a pas abouti.%")
                     ->delete();
-                $this->notifierCitoyen($declaration, "Votre déclaration #{$declaration->id} a été publiée sur Facebook, Instagram et Spotlight. Retrouvez les liens de partage dans votre dossier.");
+                $this->notifierCitoyen($declaration, "Le dossier {$declaration->libelleNotification()} a été publié sur Facebook, Instagram et Spotlight. Retrouvez les liens de partage dans votre dossier.");
                 $declaration->citoyen->notify(new DeclarationPublished(
                     $declaration->id,
                     $declaration->facebook_post_url,
                     $declaration->instagram_post_url,
+                    $declaration->libelleNotification(),
                 ));
             } catch (Throwable $exception) {
                 Log::error('Notification succes publication impossible Spotlight', [
@@ -183,6 +189,12 @@ class PublishDeclaration implements ShouldQueue
                     'exception' => $exception::class,
                     'message' => $exception->getMessage(),
                 ]);
+            }
+            if ($declaration->type === 'decouverte' && $declaration->categorie === 'objet'
+                && $declaration->rapprochementDecouverte?->statut === 'verifie') {
+                app(RapprochementNotifier::class)->depotConfirme(
+                    $declaration->rapprochementDecouverte->loadMissing('perte.citoyen', 'decouverte.citoyen')
+                );
             }
             Log::info('Declaration validee apres publications Meta Spotlight', [
                 'declaration_id' => $declaration->id,
@@ -229,6 +241,10 @@ class PublishDeclaration implements ShouldQueue
         ]);
         if ($code === 190) {
             $error = 'Connexion Meta expirée. Demandez à l’administrateur de renouveler le jeton d’accès.';
+        } elseif ($channel === 'correspondance') {
+            $error = 'Correspondance avec une perte non vérifiée. Vérifiez-la ou refusez-la avant de relancer.';
+        } elseif ($channel === 'poste') {
+            $error = 'Le justificatif du dépôt ou son contrôle par la modération manque. Reprenez le dossier avant de publier.';
         } elseif ($channel === 'technique') {
             $error = 'Erreur technique. Consultez les journaux et contactez l’administrateur.';
         } else {
@@ -246,6 +262,24 @@ class PublishDeclaration implements ShouldQueue
             'facebook_post_id' => $declaration->facebook_post_id,
             'instagram_post_id' => $declaration->instagram_post_id,
         ]);
+
+        try {
+            AppNotification::firstOrCreate(
+                [
+                    'user_id' => $declaration->user_id,
+                    'declaration_id' => $declaration->id,
+                    'message' => "La publication de {$declaration->libelleNotification()} n'a pas abouti. Votre dossier reste suivi par la modération.",
+                ],
+                ['date_envoi' => now(), 'canal' => 'app']
+            );
+            app(ModerationInboxNotifier::class)->publicationEchouee($declaration, $error);
+        } catch (Throwable $exception) {
+            Log::error('Notification echec publication impossible Spotlight', [
+                'declaration_id' => $declaration->id,
+                'exception' => $exception::class,
+                'message' => $exception->getMessage(),
+            ]);
+        }
     }
 
     private function notifierCitoyen(Declaration $declaration, string $message): void

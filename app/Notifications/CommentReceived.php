@@ -16,6 +16,7 @@ class CommentReceived extends Notification implements ShouldQueue
         public string $authorName,
         public string $content,
         public bool $isReply = false,
+        public ?string $declarationLabel = null,
     ) {}
 
     public function via(object $notifiable): array
@@ -25,10 +26,11 @@ class CommentReceived extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
+        $label = $this->declarationLabel ?? "déclaration #{$this->declarationId}";
         return (new MailMessage)
-            ->subject(($this->isReply ? 'Nouvelle réponse' : 'Nouvelle information')." sur la déclaration #{$this->declarationId}")
+            ->subject(($this->isReply ? 'Nouvelle réponse' : 'Nouvelle information')." sur {$label}")
             ->greeting('Bonjour,')
-            ->line("{$this->authorName} ".($this->isReply ? 'a répondu dans la discussion' : 'a partagé une information')." sur la déclaration #{$this->declarationId} :")
+            ->line("{$this->authorName} ".($this->isReply ? 'a répondu dans la discussion' : 'a partagé une information')." sur {$label} :")
             ->line($this->content)
             ->action('Voir les informations', route('public.declarations.show', $this->declarationId).'#discussion')
             ->line('Si ce message est inapproprié, signalez-le à la modération.');

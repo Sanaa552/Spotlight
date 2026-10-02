@@ -25,7 +25,8 @@ class PasswordResetTest extends TestCase
 
         $user = User::factory()->create();
 
-        $this->post('/forgot-password', ['email' => $user->email]);
+        $this->post('/forgot-password', ['email' => $user->email])
+            ->assertSessionHas('status', 'Lien de réinitialisation envoyé. Vérifiez votre boîte de réception et vos courriers indésirables.');
 
         Notification::assertSentTo($user, SpotlightResetPassword::class);
     }
@@ -42,6 +43,8 @@ class PasswordResetTest extends TestCase
             $response = $this->get('/reset-password/'.$notification->token);
 
             $response->assertStatus(200);
+            $response->assertSee('x-on:click="showPassword = !showPassword"', false)
+                ->assertSee('x-on:click="showConfirmation = !showConfirmation"', false);
 
             return true;
         });

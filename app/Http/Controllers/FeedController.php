@@ -77,7 +77,7 @@ class FeedController extends Controller
                 AppNotification::create([
                     'user_id' => $recipient->id,
                     'declaration_id' => $declaration->id,
-                    'message' => ($comment->parent_id ? 'Nouvelle réponse' : 'Nouvelle information')." de {$request->user()->name} sur la déclaration #{$declaration->id} : ".Str::limit($comment->contenu, 140),
+                    'message' => ($comment->parent_id ? 'Nouvelle réponse' : 'Nouvelle information')." de {$request->user()->name} sur {$declaration->libelleNotification()} : ".Str::limit($comment->contenu, 140),
                     'date_envoi' => now(),
                     'canal' => 'app',
                 ]);
@@ -86,6 +86,7 @@ class FeedController extends Controller
                     $request->user()->name,
                     $comment->contenu,
                     (bool) $comment->parent_id,
+                    $declaration->libelleNotification(),
                 ));
             } catch (Throwable $exception) {
                 Log::error('Notification de commentaire impossible Spotlight', [

@@ -26,7 +26,7 @@ class NewPublicDeclaration extends Notification implements ShouldQueue
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject("Nouvel avis Spotlight : {$this->title}")
+            ->subject("Nouvel avis Spotlight : {$this->title} (dossier #{$this->declarationId})")
             ->greeting('Bonjour,')
             ->line("Une nouvelle déclaration de {$this->type} a été publiée sur Spotlight.")
             ->line($this->title)

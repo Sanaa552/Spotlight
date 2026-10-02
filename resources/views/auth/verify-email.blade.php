@@ -49,7 +49,7 @@
                 @csrf
                 @method('PATCH')
 
-                <x-input-label for="email" value="Nouvelle adresse e-mail" />
+                <x-input-label for="email" value="Nouvelle adresse e-mail" required />
                 <x-text-input id="email" name="email" type="email" required autocomplete="email"
                               class="mt-1 block w-full" :value="old('email', auth()->user()->email)" />
                 <x-input-error :messages="$errors->emailCorrection->get('email')" class="mt-2" />

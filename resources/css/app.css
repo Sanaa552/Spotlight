@@ -2,6 +2,134 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+    color-scheme: light;
+    --color-nuit: 2 4 12;
+    --color-argent: 216 220 227;
+}
+
+html[data-theme="light"] {
+    --color-nuit: 247 249 252;
+    --color-argent: 29 37 51;
+}
+
+html[data-theme="light"] .bg-white\/5 {
+    background-color: #fff;
+}
+
+html[data-theme="light"] .bg-white\/10,
+html[data-theme="light"] .hover\:bg-white\/10:hover {
+    background-color: #edf1f5;
+}
+
+html[data-theme="light"] .hover\:bg-white\/5:hover {
+    background-color: #edf1f5;
+}
+
+html[data-theme="light"] .border-white\/10,
+html[data-theme="light"] .border-white\/15,
+html[data-theme="light"] .border-white\/20,
+html[data-theme="light"] .border-white\/30 {
+    border-color: #d6dde5;
+}
+
+html[data-theme="light"] .text-argent\/30,
+html[data-theme="light"] .text-argent\/40 {
+    color: rgb(29 37 51 / 0.68);
+}
+
+html[data-theme="light"] .text-argent\/50 {
+    color: rgb(29 37 51 / 0.75);
+}
+
+html[data-theme="light"] .text-white\/80,
+html[data-theme="light"] .hover\:text-white:hover {
+    color: rgb(29 37 51 / 0.85);
+}
+
+html[data-theme="light"] .spotlight-bottom-nav a.text-white:not(.bg-alerte) {
+    color: rgb(29 37 51);
+}
+
+html:not([data-theme="light"]) .spotlight-form-panel {
+    color-scheme: dark;
+    background-color: #121b27;
+    color: #e7eef6;
+    border-color: #344355;
+}
+
+html:not([data-theme="light"]) .spotlight-form-panel .text-gray-900,
+html:not([data-theme="light"]) .spotlight-form-panel .text-gray-800,
+html:not([data-theme="light"]) .spotlight-form-panel .text-gray-700 {
+    color: #e7eef6;
+}
+
+html:not([data-theme="light"]) .spotlight-form-panel .text-gray-600,
+html:not([data-theme="light"]) .spotlight-form-panel .text-gray-500,
+html:not([data-theme="light"]) .spotlight-form-panel .text-gray-400 {
+    color: #b9c6d5;
+}
+
+html:not([data-theme="light"]) .spotlight-form-panel .text-alerte-dark {
+    color: #ff999c;
+}
+
+html:not([data-theme="light"]) .spotlight-form-panel .text-sonar-dark {
+    color: #74d9ce;
+}
+
+html:not([data-theme="light"]) .spotlight-form-panel .text-azur {
+    color: #8cc8ff;
+}
+
+html:not([data-theme="light"]) .spotlight-form-panel .border-gray-100,
+html:not([data-theme="light"]) .spotlight-form-panel .border-gray-200,
+html:not([data-theme="light"]) .spotlight-form-panel .border-gray-300 {
+    border-color: #405168;
+}
+
+html:not([data-theme="light"]) .spotlight-form-panel .bg-gray-100 {
+    background-color: #233246;
+}
+
+html:not([data-theme="light"]) .spotlight-form-panel input:not([type="file"]):not([type="radio"]):not([type="checkbox"]):not([type="hidden"]),
+html:not([data-theme="light"]) .spotlight-form-panel select,
+html:not([data-theme="light"]) .spotlight-form-panel textarea {
+    background-color: #192637;
+    border-color: #405168;
+    color: #f2f6fb;
+}
+
+html:not([data-theme="light"]) .spotlight-form-panel input::placeholder,
+html:not([data-theme="light"]) .spotlight-form-panel textarea::placeholder {
+    color: #a5b4c6;
+}
+
+html:not([data-theme="light"]) .spotlight-form-panel input[type="file"] {
+    color: #d6e1ed;
+}
+
+html:not([data-theme="light"]) .spotlight-form-panel input[type="file"]::file-selector-button {
+    background-color: #26384d;
+    color: #e7eef6;
+}
+
+html:not([data-theme="light"]) .spotlight-form-panel .hover\:text-gray-900:hover {
+    color: #fff;
+}
+
+.theme-icon-moon {
+    display: none;
+}
+
+html[data-theme="light"] .theme-icon-sun {
+    display: none;
+}
+
+html[data-theme="light"] .theme-icon-moon {
+    display: block;
+}
+
 [x-cloak] {
     display: none !important;
 }

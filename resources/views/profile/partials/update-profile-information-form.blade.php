@@ -27,20 +27,21 @@
             @endif
 
             <div class="flex-1">
-                <x-input-label for="photo" value="Photo de profil" />
+                <x-input-label for="photo" value="Photo de profil (facultative)" />
                 <input id="photo" name="photo" type="file" accept=".jpg,.jpeg,.png"
                        class="mt-1 block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-azur/10 file:text-azur hover:file:bg-azur/20" />
+                <p class="mt-1 text-xs text-gray-500">Votre avatar dans Spotlight, distinct de la photo publique d'une déclaration. JPG ou PNG, 8 Mo maximum.</p>
                 <x-input-error class="mt-2" :messages="$errors->get('photo')" />
             </div>
         </div>
         <div>
-            <x-input-label for="name" :value="__('Name')" />
+            <x-input-label for="name" value="Nom" required />
             <x-text-input id="name" name="name" type="text" class="mt-1 block w-full" :value="old('name', $user->name)" required autofocus autocomplete="name" />
             <x-input-error class="mt-2" :messages="$errors->get('name')" />
         </div>
 
         <div>
-            <x-input-label for="email" :value="__('Email')" />
+            <x-input-label for="email" :value="__('Email')" required />
             <x-text-input id="email" name="email" type="email" class="mt-1 block w-full" :value="old('email', $user->email)" required autocomplete="username" />
             <x-input-error class="mt-2" :messages="$errors->get('email')" />
 

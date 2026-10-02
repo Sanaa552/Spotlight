@@ -8,6 +8,7 @@ use App\Models\Localisation;
 use App\Models\PieceJointe;
 use App\Models\Rapprochement;
 use App\Services\RapprochementNotifier;
+use App\Services\ModerationInboxNotifier;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -43,7 +44,7 @@ class DeclarationController extends Controller
             : '';
 
         $perteId = old('perte_id', $request->query('perte_id'));
-        $perteInitiale = is_numeric($perteId) ? Declaration::perteObjetPublique((int) $perteId) : null;
+        $perteInitiale = is_numeric($perteId) ? Declaration::perteObjetDisponible((int) $perteId) : null;
 
         return view('declarations.create', [
             'posteInitial' => $posteInitial,
@@ -165,8 +166,8 @@ class DeclarationController extends Controller
 
         $validator->after(function ($validator) use ($request, $files, $declarationPerte, $photoPublique, $preuveDecouverte, $preuveSignalement) {
             if ($request->filled('perte_id') && is_numeric($request->input('perte_id'))
-                && ! Declaration::perteObjetPublique((int) $request->input('perte_id'))) {
-                $validator->errors()->add('perte_id', 'Cette annonce de perte n’est plus disponible. Choisissez-en une autre ou déclarez sans correspondance.');
+                && ! Declaration::perteObjetDisponible((int) $request->input('perte_id'))) {
+                $validator->errors()->add('perte_id', 'Cette perte est déjà localisée ou n’est plus disponible pour une correspondance. Déclarez votre découverte sans annonce liée si nécessaire.');
             }
             $totalBytes = $files->sum(fn ($file) => (int) $file->getSize())
                 + ($declarationPerte ? (int) $declarationPerte->getSize() : 0)
@@ -274,6 +275,8 @@ class DeclarationController extends Controller
             'has_photo_publique' => filled($declaration->photo_path),
             'has_coordinates' => filled($validated['latitude'] ?? null) && filled($validated['longitude'] ?? null),
         ]);
+
+        app(ModerationInboxNotifier::class)->declarationSoumise($declaration);
 
         if ($declaration->rapprochementDecouverte) {
             app(RapprochementNotifier::class)->proposition($declaration->rapprochementDecouverte);
@@ -422,6 +425,8 @@ class DeclarationController extends Controller
             'declaration_id' => $declaration->id,
             'user_id' => $request->user()->id,
         ]);
+
+        app(ModerationInboxNotifier::class)->preuveAjoutee($declaration);
 
         return back()->with('success', 'Justificatif ajouté. La modération peut maintenant vérifier votre dossier.');
     }

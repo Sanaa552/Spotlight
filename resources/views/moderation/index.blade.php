@@ -91,7 +91,7 @@
                                 <p class="mt-2 text-sm leading-6 text-gray-600">
                                     Le citoyen recevra le motif du rejet de la déclaration <strong>#{{ $declaration->id }}</strong>.
                                 </p>
-                                <label for="motif-rejet-{{ $declaration->id }}" class="mt-4 block text-sm font-medium text-gray-700">Motif du rejet</label>
+                                <label for="motif-rejet-{{ $declaration->id }}" class="mt-4 block text-sm font-medium text-gray-700">Motif du rejet <span class="text-alerte" aria-hidden="true">*</span><span class="sr-only"> (obligatoire)</span></label>
                                 <textarea name="motif_rejet" rows="2" required
                                           id="motif-rejet-{{ $declaration->id }}"
                                           class="block w-full border-gray-300 rounded-md shadow-sm focus:border-alerte focus:ring-alerte"

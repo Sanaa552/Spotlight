@@ -8,6 +8,13 @@
     <div class="py-8">
         <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
 
+            <nav aria-label="Parcourir les avis" class="mb-6 flex items-center gap-1 overflow-x-auto border-b border-white/15 text-sm font-medium whitespace-nowrap">
+                <a href="{{ route('dashboard') }}" aria-current="page" class="shrink-0 border-b-2 border-alerte px-3 py-3 text-argent sm:px-4">À la une</a>
+                <a href="{{ route('public.declarations.index', ['onglet' => 'pertes']) }}" class="shrink-0 border-b-2 border-transparent px-3 py-3 text-argent/70 transition hover:border-white/30 hover:text-argent focus-visible:text-argent sm:px-4">Pertes</a>
+                <a href="{{ route('public.declarations.index', ['onglet' => 'decouvertes']) }}" class="shrink-0 border-b-2 border-transparent px-3 py-3 text-argent/70 transition hover:border-white/30 hover:text-argent focus-visible:text-argent sm:px-4">Découvertes</a>
+                <a href="{{ route('public.declarations.index', ['onglet' => 'restitutions']) }}" class="shrink-0 border-b-2 border-transparent px-3 py-3 text-argent/70 transition hover:border-white/30 hover:text-argent focus-visible:text-argent sm:px-4">Restitutions</a>
+            </nav>
+
             @if (session('success'))
                 <div class="bg-sonar/10 border border-sonar/30 text-sonar-dark px-4 py-3 rounded-xl mb-6">
                     {{ session('success') }}
@@ -159,19 +166,22 @@
                                     <span>Réponse à <span x-text="replyName"></span></span>
                                     <button type="button" x-on:click="replyTo = null; replyName = ''" class="text-gray-500 hover:text-gray-900" aria-label="Annuler la réponse">Annuler</button>
                                 </div>
-                                <form method="POST" action="{{ route('declarations.commenter', $declaration) }}" class="flex items-center gap-2 pt-2">
+                                <form method="POST" action="{{ route('declarations.commenter', $declaration) }}" class="pt-2">
                                     @csrf
                                     <input type="hidden" name="parent_id" x-bind:value="replyTo || ''">
-                                    <input type="text" name="contenu" required maxlength="1000"
-                                           x-ref="commentInput"
-                                           placeholder="Partager une info..."
-                                           class="flex-1 text-sm border-gray-300 rounded-full focus:border-alerte focus:ring-alerte">
-                                    <button type="submit" title="Envoyer cette information" aria-label="Envoyer cette information"
-                                            class="shrink-0 w-9 h-9 rounded-full bg-alerte text-white flex items-center justify-center hover:bg-alerte-dark transition">
-                                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                                            <path d="M2 21l21-9L2 3v7l15 2-15 2z"/>
-                                        </svg>
-                                    </button>
+                                    <label for="comment-{{ $declaration->id }}" class="mb-1 block text-xs font-medium text-gray-600">Partager une information <span class="text-alerte" aria-hidden="true">*</span><span class="sr-only"> (obligatoire)</span></label>
+                                    <div class="flex items-center gap-2">
+                                        <input id="comment-{{ $declaration->id }}" type="text" name="contenu" required maxlength="1000"
+                                               x-ref="commentInput"
+                                               placeholder="Votre information..."
+                                               class="min-w-0 flex-1 text-sm border-gray-300 rounded-full focus:border-alerte focus:ring-alerte">
+                                        <button type="submit" title="Envoyer cette information" aria-label="Envoyer cette information"
+                                                class="shrink-0 w-9 h-9 rounded-full bg-alerte text-white flex items-center justify-center hover:bg-alerte-dark transition">
+                                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                                <path d="M2 21l21-9L2 3v7l15 2-15 2z"/>
+                                            </svg>
+                                        </button>
+                                    </div>
                                 </form>
                             </div>
 

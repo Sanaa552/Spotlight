@@ -12,7 +12,7 @@
                 <tr><td style="background:#02040c;padding:20px 28px;color:#ffffff;font-size:24px;font-weight:700;"><span style="color:#e31e24;">S</span>potlight</td></tr>
                 <tr><td style="padding:30px 28px;">
                     <p style="margin:0 0 16px;font-size:18px;font-weight:700;">Bonjour {{ $notifiable->name }},</p>
-                    <p style="line-height:1.6;color:#4b5563;">Votre déclaration #{{ $declarationId }} est confirmée sur Facebook, Instagram et Spotlight. Vous pouvez consulter votre dossier et partager les publications.</p>
+                    <p style="line-height:1.6;color:#4b5563;">Le dossier {{ $declarationLabel }} est confirmé sur Facebook, Instagram et Spotlight. Vous pouvez le consulter et partager les publications.</p>
                     <p style="margin:24px 0;"><a href="{{ $declarationUrl }}" style="display:inline-block;background:#e31e24;color:#ffffff;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:6px;">Voir ma déclaration</a></p>
                     @if ($facebookUrl)
                         <p style="margin:0 0 12px;"><a href="{{ $facebookUrl }}" style="color:#1664d9;">Voir la publication Facebook</a></p>
