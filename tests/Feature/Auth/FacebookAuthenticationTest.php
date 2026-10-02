@@ -36,7 +36,7 @@ class FacebookAuthenticationTest extends TestCase
         $this->assertAuthenticatedAs($user);
         $this->get(route('dashboard'))->assertRedirect(route('facebook.profile.edit'));
         $this->get(route('declarations.create'))->assertRedirect(route('facebook.profile.edit'));
-        $this->get(route('profile.edit'))->assertRedirect(route('facebook.profile.edit'));
+        $this->get(route('profile.edit'))->assertOk();
         $this->get(route('facebook.profile.edit'))->assertOk()
             ->assertSee('Indiquez de préférence votre numéro WhatsApp.')
             ->assertDontSee('name="email"', false)
@@ -298,6 +298,39 @@ class FacebookAuthenticationTest extends TestCase
         $this->get(route('facebook.callback', ['code' => 'fake-code', 'state' => 'wrong']))
             ->assertRedirect(route('login'))
             ->assertSessionHasErrors('email');
+        $this->assertGuest();
+    }
+
+    public function test_temporary_mobile_diagnostic_tracks_departure_and_invalid_state_without_logging_oauth_values(): void
+    {
+        config()->set('services.facebook.client_id', 'test-client-id');
+        config()->set('services.facebook.client_secret', 'test-client-secret');
+        config()->set('services.facebook.mobile_diagnostic_enabled', true);
+        Log::spy();
+
+        $this->get(route('facebook.redirect'))->assertRedirect()->assertSessionHas('state');
+        $trace = session('facebook_login_trace');
+        $this->assertNotEmpty($trace);
+        Log::shouldHaveReceived('info')->with('Diagnostic depart OAuth Facebook Spotlight', Mockery::on(
+            fn (array $context) => $context['trace'] === $trace
+                && $context['purpose'] === 'login'
+                && $context['session_state_present'] === true
+                && is_bool($context['request_secure'])
+                && count($context) === 4
+        ))->once();
+
+        $this->get(route('facebook.callback', ['code' => 'fake-code', 'state' => 'wrong']))
+            ->assertRedirect(route('login'))->assertSessionHasErrors('email');
+        Log::shouldHaveReceived('info')->with('Diagnostic retour OAuth Facebook Spotlight', Mockery::on(
+            fn (array $context) => $context['trace'] === $trace
+                && $context['session_state_present'] === true
+                && is_bool($context['session_cookie_present'])
+                && $context['state_parameter_present'] === true
+                && $context['code_present'] === true
+                && $context['error_present'] === false
+                && is_bool($context['request_secure'])
+                && count($context) === 7
+        ))->once();
         $this->assertGuest();
     }
 

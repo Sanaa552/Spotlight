@@ -28,6 +28,7 @@ class User extends Authenticatable implements MustVerifyEmailContract
         'facebook_id',
         'facebook_avatar_url',
         'password',
+        'password_is_local',
         'role',
         'is_blocked',
         'new_declaration_email',
@@ -43,6 +44,7 @@ class User extends Authenticatable implements MustVerifyEmailContract
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'password_is_local' => 'boolean',
             'role' => Role::class,
             'is_blocked' => 'boolean',
             'new_declaration_email' => 'boolean',
@@ -60,6 +62,17 @@ class User extends Authenticatable implements MustVerifyEmailContract
     {
         return $this->isCitoyen() && filled($this->facebook_id)
             && (blank($this->telephone) || blank($this->email));
+    }
+
+    public function canConfirmDeletionWithPassword(): bool
+    {
+        return $this->password_is_local !== false;
+    }
+
+    public function canConfirmDeletionWithFacebook(): bool
+    {
+        return $this->isCitoyen() && filled($this->facebook_id)
+            && $this->password_is_local !== true;
     }
 
     public function photoUrl(): ?string

@@ -15,9 +15,19 @@
             <a href="{{ route('public.about') }}" class="text-sm {{ request()->routeIs('public.about') ? 'text-argent font-semibold' : 'text-argent/60 hover:text-argent' }} transition">
                 À propos
             </a>
-            <a href="{{ route('declarations.create') }}" class="text-sm text-argent/60 hover:text-argent transition">
-                Ajouter une déclaration
-            </a>
+            @guest
+                <a href="{{ route('register') }}" class="text-sm text-argent/60 hover:text-argent transition">Ajouter une déclaration</a>
+            @else
+                @if (auth()->user()->needsFacebookProfileCompletion())
+                    <a href="{{ route('facebook.profile.edit') }}" class="text-sm text-argent/60 hover:text-argent transition">Compléter mon profil</a>
+                @elseif (! auth()->user()->hasVerifiedEmail())
+                    <a href="{{ route('verification.notice') }}" class="text-sm text-argent/60 hover:text-argent transition">Vérifier mon e-mail</a>
+                @elseif (auth()->user()->isCitoyen() && ! auth()->user()->is_blocked)
+                    <a href="{{ route('declarations.create') }}" class="text-sm text-argent/60 hover:text-argent transition">Ajouter une déclaration</a>
+                @elseif (! auth()->user()->is_blocked)
+                    <a href="{{ route('moderation.index') }}" class="text-sm text-argent/60 hover:text-argent transition">Modération</a>
+                @endif
+            @endguest
         </nav>
 
         <div class="flex items-center gap-1 sm:gap-3">
@@ -25,7 +35,7 @@
             @auth
                 <a href="{{ route('dashboard') }}"
                    class="inline-flex items-center px-5 py-2 bg-alerte border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-alerte-dark transition">
-                    Tableau de bord
+                    {{ auth()->user()->isCitoyen() ? 'Mon espace' : (auth()->user()->isAdministrateur() ? 'Dashboard' : 'Tableau de bord') }}
                 </a>
             @else
                 <a href="{{ route('login') }}" class="text-xs sm:text-sm font-medium text-argent/70 hover:text-argent transition">

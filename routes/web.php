@@ -49,11 +49,15 @@ Route::get('/declarations/{declaration}/statut-publication', [DeclarationControl
     ->middleware(['auth', 'not_blocked', 'facebook_profile_complete', 'verified'])
     ->name('declarations.publication-status');
 
-Route::middleware(['auth', 'not_blocked', 'facebook_profile_complete'])->group(function () {
+Route::middleware(['auth', 'not_blocked'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::post('/profile/facebook/delete/reauth', [\App\Http\Controllers\Auth\FacebookAuthController::class, 'deleteRedirect'])
+        ->middleware('throttle:3,1')->name('profile.facebook.delete.redirect');
 });
+
+Route::patch('/profile', [ProfileController::class, 'update'])
+    ->middleware(['auth', 'not_blocked', 'facebook_profile_complete'])->name('profile.update');
 
 require __DIR__.'/auth.php';
 

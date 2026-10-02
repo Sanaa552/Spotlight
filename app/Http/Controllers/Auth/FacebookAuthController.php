@@ -44,15 +44,51 @@ class FacebookAuthController extends Controller
             return redirect()->away($origin.'/auth/facebook');
         }
 
-        return Socialite::driver('facebook')
+        $response = Socialite::driver('facebook')
             ->usingGraphVersion(config('services.meta.graph_version', 'v26.0'))
             ->setScopes(['public_profile', 'email'])
             ->redirect();
+
+        $this->logLoginStart($request, 'login');
+
+        return $response;
     }
 
     public function callback(Request $request): RedirectResponse
     {
+        $this->logLoginCallback($request);
+
+        if ($request->filled('error')) {
+            $deleting = $request->user() && $request->session()->has('facebook_delete_user_id');
+            $linking = $request->user() && $request->session()->has('facebook_link_user_id');
+            $request->session()->forget([
+                'facebook_delete_user_id', 'facebook_delete_started_at',
+                'facebook_delete_verified_at', 'facebook_delete_verified_user_id',
+                'facebook_link_user_id', 'facebook_login_trace',
+            ]);
+
+            if ($deleting) {
+                return redirect()->route('profile.edit')->withErrors([
+                    'facebook' => 'Confirmation Facebook annulée. Votre compte n’a pas été supprimé.',
+                ], 'userDeletion');
+            }
+
+            if ($linking) {
+                return redirect()->route('profile.edit')->withErrors([
+                    'facebook' => 'Liaison Facebook annulée. Votre compte reste inchangé.',
+                ]);
+            }
+
+            return redirect()->route('login')->withErrors([
+                'email' => 'Connexion Facebook annulée. Vous pouvez réessayer.',
+            ]);
+        }
+
         if ($request->user()) {
+            if ($request->session()->has('facebook_delete_user_id')) {
+                return $this->deleteCallback($request);
+            }
+
             return $request->session()->has('facebook_link_user_id')
                 ? $this->linkCallback($request)
                 : redirect()->route('dashboard');
@@ -145,6 +181,7 @@ class FacebookAuthController extends Controller
                     'facebook_id' => $facebookId,
                     'facebook_avatar_url' => $facebookUser->getAvatar(),
                     'password' => Hash::make(Str::random(32)),
+                    'password_is_local' => false,
                     'role' => Role::Citoyen,
                 ]);
                 if ($email) {
@@ -197,10 +234,123 @@ class FacebookAuthController extends Controller
 
         $request->session()->put('facebook_link_user_id', $user->id);
 
-        return Socialite::driver('facebook')
+        $response = Socialite::driver('facebook')
             ->usingGraphVersion(config('services.meta.graph_version', 'v26.0'))
             ->setScopes(['public_profile', 'email'])
             ->redirect();
+
+        $this->logLoginStart($request, 'link');
+
+        return $response;
+    }
+
+    public function deleteRedirect(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user->canConfirmDeletionWithFacebook() && ! $user->is_blocked, 403);
+
+        $callbackHost = parse_url((string) config('services.facebook.redirect'), PHP_URL_HOST);
+        if (! $callbackHost || strcasecmp($request->getHost(), $callbackHost) !== 0) {
+            return redirect()->route('profile.edit')->withErrors([
+                'facebook' => 'Ouvrez Spotlight sur son domaine officiel avant de confirmer la suppression.',
+            ], 'userDeletion');
+        }
+
+        $request->session()->forget(['facebook_delete_verified_at', 'facebook_delete_verified_user_id']);
+        $request->session()->put([
+            'facebook_delete_user_id' => $user->id,
+            'facebook_delete_started_at' => time(),
+        ]);
+
+        $response = Socialite::driver('facebook')
+            ->usingGraphVersion(config('services.meta.graph_version', 'v26.0'))
+            ->setScopes(['public_profile'])
+            ->with(['auth_type' => 'reauthenticate'])
+            ->redirect();
+
+        $this->logLoginStart($request, 'delete');
+
+        return $response;
+    }
+
+    private function deleteCallback(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        $expectedUserId = $request->session()->pull('facebook_delete_user_id');
+        $startedAt = $request->session()->pull('facebook_delete_started_at');
+
+        if (! $user->canConfirmDeletionWithFacebook() || (int) $expectedUserId !== $user->id
+            || ! is_numeric($startedAt) || (int) $startedAt > time()
+            || time() - (int) $startedAt > 300) {
+            return redirect()->route('profile.edit')->withErrors([
+                'facebook' => 'La confirmation Facebook a expiré. Recommencez depuis votre profil.',
+            ], 'userDeletion');
+        }
+
+        try {
+            $facebookUser = Socialite::driver('facebook')
+                ->usingGraphVersion(config('services.meta.graph_version', 'v26.0'))
+                ->setHttpClient(new Client(['verify' => config('services.meta.ca_bundle') ?: true]))
+                ->fields(['id'])
+                ->user();
+        } catch (Throwable $exception) {
+            Log::warning('Confirmation suppression Facebook echouee Spotlight', [
+                'user_id' => $user->id,
+                'exception' => $exception::class,
+            ]);
+
+            return redirect()->route('profile.edit')->withErrors([
+                'facebook' => 'Confirmation Facebook annulée ou impossible. Votre compte n’a pas été supprimé.',
+            ], 'userDeletion');
+        }
+
+        if (! hash_equals((string) $user->facebook_id, (string) $facebookUser->getId())) {
+            Log::warning('Identite Facebook differente pour suppression Spotlight', ['user_id' => $user->id]);
+
+            return redirect()->route('profile.edit')->withErrors([
+                'facebook' => 'Ce profil Facebook ne correspond pas au compte Spotlight à supprimer.',
+            ], 'userDeletion');
+        }
+
+        $request->session()->put([
+            'facebook_delete_verified_user_id' => $user->id,
+            'facebook_delete_verified_at' => time(),
+        ]);
+
+        return redirect()->route('profile.edit')->with('facebook_delete_confirmed', true);
+    }
+
+    private function logLoginStart(Request $request, string $purpose): void
+    {
+        if (! config('services.facebook.mobile_diagnostic_enabled')) {
+            return;
+        }
+
+        $trace = Str::random(12);
+        $request->session()->put('facebook_login_trace', $trace);
+        Log::info('Diagnostic depart OAuth Facebook Spotlight', [
+            'trace' => $trace,
+            'purpose' => $purpose,
+            'session_state_present' => $request->session()->has('state'),
+            'request_secure' => $request->isSecure(),
+        ]);
+    }
+
+    private function logLoginCallback(Request $request): void
+    {
+        if (! config('services.facebook.mobile_diagnostic_enabled')) {
+            return;
+        }
+
+        Log::info('Diagnostic retour OAuth Facebook Spotlight', [
+            'trace' => $request->session()->pull('facebook_login_trace'),
+            'session_state_present' => $request->session()->has('state'),
+            'session_cookie_present' => $request->hasCookie(config('session.cookie')),
+            'state_parameter_present' => $request->filled('state'),
+            'code_present' => $request->filled('code'),
+            'error_present' => $request->filled('error'),
+            'request_secure' => $request->isSecure(),
+        ]);
     }
 
     public function linkCallback(Request $request): RedirectResponse
@@ -243,6 +393,7 @@ class FacebookAuthController extends Controller
 
         try {
             $user->facebook_id = $facebookId;
+            $user->password_is_local = true;
             $user->facebook_avatar_url = $facebookUser->getAvatar();
             $user->save();
         } catch (QueryException $exception) {

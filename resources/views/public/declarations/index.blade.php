@@ -93,14 +93,26 @@
             </div>
         @endif
 
-        <div class="mt-16 text-center bg-white/5 border border-white/10 rounded-lg p-8">
-            <p class="text-argent/70 text-sm mb-4">
-                Vous avez des informations sur l'un de ces cas, ou vous voulez signaler une disparition ?
-            </p>
-            <a href="{{ route('register') }}"
-               class="inline-flex items-center px-6 py-3 bg-alerte rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-alerte-dark transition">
-                Créer un compte pour agir
-            </a>
+        <div class="mt-16 border-t border-white/10 py-8 text-center">
+            @guest
+                <p class="mb-4 text-sm text-argent/70">Vous avez des informations sur l'un de ces cas, ou vous voulez signaler une disparition ?</p>
+                <a href="{{ route('register') }}" class="inline-flex items-center rounded-md bg-alerte px-6 py-3 text-xs font-semibold uppercase text-white transition hover:bg-alerte-dark">Créer un compte pour agir</a>
+            @else
+                @if (auth()->user()->is_blocked)
+                    <p class="text-sm text-argent/70">Votre compte est bloqué. Contactez l'administration pour participer.</p>
+                @elseif (auth()->user()->needsFacebookProfileCompletion())
+                    <p class="mb-4 text-sm text-argent/70">Complétez votre profil pour participer.</p>
+                    <a href="{{ route('facebook.profile.edit') }}" class="inline-flex items-center rounded-md bg-alerte px-6 py-3 text-xs font-semibold uppercase text-white">Compléter mon profil</a>
+                @elseif (! auth()->user()->hasVerifiedEmail())
+                    <p class="mb-4 text-sm text-argent/70">Vérifiez votre adresse e-mail pour participer.</p>
+                    <a href="{{ route('verification.notice') }}" class="inline-flex items-center rounded-md bg-alerte px-6 py-3 text-xs font-semibold uppercase text-white">Vérifier mon e-mail</a>
+                @elseif (auth()->user()->isCitoyen())
+                    <p class="mb-4 text-sm text-argent/70">Vous avez retrouvé un objet ou souhaitez signaler une disparition ?</p>
+                    <a href="{{ route('declarations.create') }}" class="inline-flex items-center rounded-md bg-alerte px-6 py-3 text-xs font-semibold uppercase text-white">Faire une déclaration</a>
+                @else
+                    <a href="{{ route('moderation.index') }}" class="inline-flex items-center rounded-md bg-alerte px-6 py-3 text-xs font-semibold uppercase text-white">Ouvrir la modération</a>
+                @endif
+            @endguest
         </div>
 
     </main>

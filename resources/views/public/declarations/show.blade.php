@@ -50,8 +50,17 @@
                 <p class="mt-4 text-sm text-argent/80">Une découverte correspondante a été vérifiée. Le propriétaire doit confirmer la récupération ; l’objet n’est pas encore marqué comme restitué.</p>
             @endif
             @if ($declaration->type === 'perte' && $declaration->categorie === 'objet' && $declaration->statut === 'validee' && \App\Models\Declaration::perteObjetDisponible($declaration->id))
-                <a href="{{ route('declarations.create', ['perte_id' => $declaration->id]) }}"
-                   class="mt-5 inline-flex rounded-md bg-sonar px-4 py-2 text-sm font-semibold text-white hover:bg-sonar-dark">J’ai retrouvé cet objet</a>
+                @guest
+                    <a href="{{ route('login') }}" class="mt-5 inline-flex rounded-md bg-sonar px-4 py-2 text-sm font-semibold text-white hover:bg-sonar-dark">Se connecter pour signaler une découverte</a>
+                @else
+                    @if (auth()->user()->needsFacebookProfileCompletion())
+                        <a href="{{ route('facebook.profile.edit') }}" class="mt-5 inline-flex rounded-md bg-sonar px-4 py-2 text-sm font-semibold text-white">Compléter mon profil pour agir</a>
+                    @elseif (! auth()->user()->hasVerifiedEmail())
+                        <a href="{{ route('verification.notice') }}" class="mt-5 inline-flex rounded-md bg-sonar px-4 py-2 text-sm font-semibold text-white">Vérifier mon e-mail pour agir</a>
+                    @elseif (auth()->user()->isCitoyen() && ! auth()->user()->is_blocked)
+                        <a href="{{ route('declarations.create', ['perte_id' => $declaration->id]) }}" class="mt-5 inline-flex rounded-md bg-sonar px-4 py-2 text-sm font-semibold text-white hover:bg-sonar-dark">J’ai retrouvé cet objet</a>
+                    @endif
+                @endguest
             @endif
             <div class="mt-6 flex flex-wrap gap-4 text-sm font-medium text-azur">
                 @if ($declaration->facebook_post_url)
@@ -83,11 +92,11 @@
                             <p class="mt-1 text-xs text-azur">En réponse à {{ $commentaire->parent->auteur?->name ?? 'un membre' }}</p>
                         @endif
                         <p class="mt-2 whitespace-pre-line text-sm leading-6 text-argent/80">{{ $commentaire->contenu }}</p>
-                        @auth
+                        @if (auth()->check() && auth()->user()->hasVerifiedEmail() && ! auth()->user()->is_blocked && ! auth()->user()->needsFacebookProfileCompletion())
                             <button type="button" data-author="{{ $commentaire->auteur->name }}"
                                     x-on:click="replyTo = '{{ $commentaire->id }}'; replyName = $el.dataset.author; $nextTick(() => $refs.commentInput.focus())"
                                     class="mt-2 text-xs font-medium text-azur hover:underline">Répondre</button>
-                        @endauth
+                        @endif
                     </div>
                 @empty
                     <p class="py-5 text-sm text-argent/60">Aucune information partagée pour le moment.</p>
@@ -95,7 +104,11 @@
             </div>
 
             @auth
-                @if (auth()->user()->hasVerifiedEmail() && ! auth()->user()->is_blocked)
+                @if (auth()->user()->needsFacebookProfileCompletion())
+                    <a href="{{ route('facebook.profile.edit') }}" class="mt-6 inline-block rounded-md bg-alerte px-5 py-2 text-sm font-semibold text-white">Compléter mon profil pour participer</a>
+                @elseif (! auth()->user()->hasVerifiedEmail())
+                    <a href="{{ route('verification.notice') }}" class="mt-6 inline-block rounded-md bg-alerte px-5 py-2 text-sm font-semibold text-white">Vérifier mon e-mail pour participer</a>
+                @elseif (! auth()->user()->is_blocked)
                     <form method="POST" action="{{ route('declarations.commenter', $declaration) }}" class="mt-6 space-y-3">
                         @csrf
                         <input type="hidden" name="parent_id" x-bind:value="replyTo">

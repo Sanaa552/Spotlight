@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-argent leading-tight">
-            {{ __('Fil d\'actualité') }}
+            {{ auth()->user()->isCitoyen() ? 'Mon espace' : (auth()->user()->isAdministrateur() ? 'Dashboard' : __('Fil d\'actualité')) }}
         </h2>
     </x-slot>
 

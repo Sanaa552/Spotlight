@@ -1,3 +1,4 @@
+@php($homeLabel = auth()->user()->isCitoyen() ? 'Mon espace' : (auth()->user()->isAdministrateur() ? 'Dashboard' : 'Accueil'))
 <nav x-data="{ open: false }" class="bg-nuit border-b border-white/10 fixed top-0 inset-x-0 z-40">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
@@ -10,7 +11,7 @@
 
                 <!-- Icônes de navigation -->
                 <div class="hidden sm:flex items-center gap-1">
-                    <a href="{{ route('dashboard') }}" title="Accueil"
+                    <a href="{{ route('dashboard') }}" title="{{ $homeLabel }}" aria-label="{{ $homeLabel }}"
                        class="p-2.5 rounded-full transition {{ request()->routeIs('dashboard') ? 'text-alerte bg-alerte/10' : 'text-argent/60 hover:text-argent hover:bg-white/5' }}">
                         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M12 3l9 8h-3v9h-5v-6H11v6H6v-9H3l9-8z"/>
@@ -144,7 +145,7 @@
     <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden bg-nuit">
         <div class="pt-2 pb-3 space-y-1">
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
-                {{ __('Accueil') }}
+                {{ $homeLabel }}
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('public.declarations.index')" :active="request()->routeIs('public.declarations.*')">
                 {{ __('Voir les avis') }}
@@ -209,7 +210,7 @@
                 <a href="{{ route('dashboard') }}"
                    class="flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-lg px-1 text-[11px] font-medium transition {{ request()->routeIs('dashboard') ? 'text-white bg-alerte/15' : 'text-argent/60' }}">
                     <x-icon name="home" class="h-5 w-5" />
-                    <span>Accueil</span>
+                    <span>{{ $homeLabel }}</span>
                 </a>
 
                 @if (auth()->user()->isCitoyen())

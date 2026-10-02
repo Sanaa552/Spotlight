@@ -3,6 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
+use App\Models\Commentaire;
+use App\Models\Declaration;
+use App\Models\PublicationReminder;
+use App\Models\Rapprochement;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,6 +23,9 @@ class ProfileController extends Controller
     {
         return view('profile.edit', [
             'user' => $request->user(),
+            'facebookDeletionConfirmed' => (int) $request->session()->get('facebook_delete_verified_user_id') === $request->user()->id
+                && (int) $request->session()->get('facebook_delete_verified_at', 0) <= time()
+                && time() - (int) $request->session()->get('facebook_delete_verified_at', 0) <= 300,
         ]);
     }
 
@@ -59,11 +66,41 @@ class ProfileController extends Controller
             ], 'userDeletion');
         }
 
-        $request->validateWithBag('userDeletion', [
-            'password' => ['required', 'current_password'],
-        ]);
-
         $user = $request->user();
+
+        if ($request->input('confirmation_method') === 'facebook' && $user->canConfirmDeletionWithFacebook()) {
+            $request->validateWithBag('userDeletion', ['confirm_delete' => ['accepted']]);
+
+            if ((int) $request->session()->get('facebook_delete_verified_user_id') !== $user->id
+                || (int) $request->session()->get('facebook_delete_verified_at', 0) > time()
+                || time() - (int) $request->session()->get('facebook_delete_verified_at', 0) > 300) {
+                return back()->withErrors([
+                    'facebook' => 'La confirmation Facebook a expiré. Recommencez avant de supprimer le compte.',
+                ], 'userDeletion');
+            }
+        } elseif (in_array($request->input('confirmation_method'), [null, 'password'], true)
+            && $user->canConfirmDeletionWithPassword()) {
+            $request->validateWithBag('userDeletion', [
+                'password' => ['required', 'current_password'],
+            ], [
+                'password.required' => 'Saisissez votre mot de passe Spotlight actuel.',
+                'password.current_password' => 'Le mot de passe Spotlight actuel est incorrect.',
+            ]);
+        } else {
+            return back()->withErrors([
+                'user' => 'Confirmez votre identité avant de supprimer le compte.',
+            ], 'userDeletion');
+        }
+
+        if ($user->declarations()->exists() || $user->declarationsTraitees()->exists()
+            || Commentaire::where('user_id', $user->id)->exists()
+            || PublicationReminder::where('user_id', $user->id)->exists()
+            || Declaration::where('poste_verifie_par', $user->id)->exists()
+            || Rapprochement::where('moderateur_id', $user->id)->exists()) {
+            return back()->withErrors([
+                'user' => 'Ce compte possède des dossiers ou des interventions liés à des avis. Contactez l’administration : leur conservation et les publications Meta doivent être traitées avant toute suppression.',
+            ], 'userDeletion');
+        }
 
         Auth::logout();
 

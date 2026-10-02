@@ -1,56 +1,61 @@
-<section class="space-y-6">
+<section class="space-y-5">
     <header>
-        <h2 class="text-lg font-medium text-gray-900">
-            {{ __('Supprimer le compte') }}
-        </h2>
-
-        <p class="mt-1 text-sm text-gray-600">
-            {{ __('Une fois ton compte supprimé, toutes ses données seront définitivement effacées. Télécharge toute information que tu souhaites conserver avant de continuer.') }}
-        </p>
+        <h2 class="text-lg font-medium text-gray-900">Supprimer le compte</h2>
+        <p class="mt-1 text-sm text-gray-600">Confirmez votre identité avant toute suppression. Si votre compte contient des déclarations ou des interventions, contactez l’administration pour organiser leur conservation.</p>
     </header>
 
-    <x-danger-button
-        x-data=""
-        x-on:click.prevent="$dispatch('open-modal', 'confirm-user-deletion')"
-    >{{ __('Supprimer le compte') }}</x-danger-button>
+    <x-input-error :messages="$errors->userDeletion->get('user')" />
+    <x-input-error :messages="$errors->userDeletion->get('facebook')" />
 
-    <x-modal name="confirm-user-deletion" :show="$errors->userDeletion->isNotEmpty()" focusable>
-        <form method="post" action="{{ route('profile.destroy') }}" class="p-6">
+    @if ($user->canConfirmDeletionWithPassword())
+        <x-danger-button x-data="" x-on:click.prevent="$dispatch('open-modal', 'confirm-user-deletion')">Supprimer avec mon mot de passe</x-danger-button>
+
+        <x-modal name="confirm-user-deletion" :show="$errors->userDeletion->has('password')" focusable>
+            <form method="post" action="{{ route('profile.destroy') }}" class="p-6">
+                @csrf
+                @method('delete')
+                <input type="hidden" name="confirmation_method" value="password">
+                <h2 class="text-lg font-medium text-gray-900">Supprimer définitivement mon compte ?</h2>
+                <p class="mt-1 text-sm text-gray-600">Saisissez votre mot de passe Spotlight actuel pour confirmer.</p>
+                <div class="mt-6">
+                    <x-input-label for="delete_password" value="Mot de passe actuel" required />
+                    <x-text-input id="delete_password" name="password" type="password" required autocomplete="current-password" class="mt-1 block w-full" />
+                    <x-input-error :messages="$errors->userDeletion->get('password')" class="mt-2" />
+                </div>
+                <div class="mt-6 flex justify-end gap-3">
+                    <x-secondary-button x-on:click="$dispatch('close')">Annuler</x-secondary-button>
+                    <x-danger-button>Supprimer définitivement</x-danger-button>
+                </div>
+            </form>
+        </x-modal>
+    @endif
+
+    @if ($user->canConfirmDeletionWithFacebook())
+        <form method="post" action="{{ route('profile.facebook.delete.redirect') }}">
             @csrf
-            @method('delete')
-
-            <h2 class="text-lg font-medium text-gray-900">
-                {{ __('Es-tu sûr de vouloir supprimer ton compte ?') }}
-            </h2>
-
-            <p class="mt-1 text-sm text-gray-600">
-                {{ __('Une fois ton compte supprimé, toutes ses données seront définitivement effacées. Saisis ton mot de passe pour confirmer.') }}
-            </p>
-
-            <div class="mt-6">
-                <x-input-label for="password" value="Mot de passe" required />
-
-                <x-text-input
-                    id="password"
-                    name="password"
-                    type="password"
-                    required
-                    class="mt-1 block w-3/4"
-                    placeholder="{{ __('Mot de passe') }}"
-                />
-
-                <x-input-error :messages="$errors->userDeletion->get('password')" class="mt-2" />
-            </div>
-
-            <div class="mt-6 flex justify-end">
-                <x-secondary-button x-on:click="$dispatch('close')">
-                    {{ __('Annuler') }}
-                </x-secondary-button>
-
-                <x-danger-button class="ms-3">
-                    {{ __('Supprimer le compte') }}
-                </x-danger-button>
-            </div>
+            <x-secondary-button type="submit">Confirmer mon identité avec Facebook</x-secondary-button>
         </form>
-    </x-modal>
+
+        @if ($facebookDeletionConfirmed)
+            <x-danger-button x-data="" x-on:click.prevent="$dispatch('open-modal', 'confirm-facebook-deletion')">Continuer la suppression</x-danger-button>
+            <x-modal name="confirm-facebook-deletion" :show="session('facebook_delete_confirmed') || $errors->userDeletion->has('confirm_delete')" focusable>
+                <form method="post" action="{{ route('profile.destroy') }}" class="p-6">
+                    @csrf
+                    @method('delete')
+                    <input type="hidden" name="confirmation_method" value="facebook">
+                    <h2 class="text-lg font-medium text-gray-900">Supprimer définitivement mon compte ?</h2>
+                    <p class="mt-1 text-sm text-gray-600">Votre identité Facebook a été confirmée. Cette étape ne peut pas être annulée après validation.</p>
+                    <label class="mt-5 flex items-start gap-2 text-sm text-gray-700">
+                        <input type="checkbox" name="confirm_delete" value="1" required class="mt-1 rounded border-gray-300">
+                        <span>Je confirme vouloir supprimer définitivement mon compte Spotlight.</span>
+                    </label>
+                    <x-input-error :messages="$errors->userDeletion->get('confirm_delete')" class="mt-2" />
+                    <div class="mt-6 flex justify-end gap-3">
+                        <x-secondary-button x-on:click="$dispatch('close')">Annuler</x-secondary-button>
+                        <x-danger-button>Supprimer définitivement</x-danger-button>
+                    </div>
+                </form>
+            </x-modal>
+        @endif
+    @endif
 </section>

@@ -49,6 +49,7 @@ class RegisteredUserController extends Controller
             'email_source' => User::EMAIL_SOURCE_MANUAL,
             'telephone' => $request->telephone,
             'password' => Hash::make($request->password),
+            'password_is_local' => true,
             'role' => Role::Citoyen,
         ]);
 
