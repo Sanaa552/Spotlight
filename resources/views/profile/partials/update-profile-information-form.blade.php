@@ -101,3 +101,15 @@
         </div>
     </form>
 </section>
+
+@if ($user->isCitoyen() && blank($user->facebook_id))
+    <section class="mt-6 border-t border-gray-200 pt-5">
+        <h2 class="text-lg font-medium text-gray-900">Connexion Facebook</h2>
+        <p class="mt-1 text-sm text-gray-600">Liez votre compte après confirmation de votre mot de passe.</p>
+        <x-facebook-button href="{{ route('facebook.link.redirect') }}" label="Lier mon compte Facebook" class="mt-3 !mx-0" />
+        <x-input-error :messages="$errors->get('facebook')" class="mt-2" />
+        @if (session('status') === 'facebook-linked')
+            <p class="mt-2 text-sm text-sonar-dark">Compte Facebook lié.</p>
+        @endif
+    </section>
+@endif

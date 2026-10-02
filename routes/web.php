@@ -21,35 +21,35 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-Route::get('/dashboard', [FeedController::class, 'index'])->middleware(['auth', 'verified', 'not_blocked'])->name('dashboard');
+Route::get('/dashboard', [FeedController::class, 'index'])->middleware(['auth', 'not_blocked', 'facebook_profile_complete', 'verified'])->name('dashboard');
 
-Route::middleware(['auth', 'verified', 'not_blocked'])->group(function () {
+Route::middleware(['auth', 'not_blocked', 'facebook_profile_complete', 'verified'])->group(function () {
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('/notifications/{appNotification}/lue', [NotificationController::class, 'marquerLue'])
         ->name('notifications.marquer-lue');
 });
 
 Route::post('/declarations/{declaration}/commenter', [FeedController::class, 'commenter'])
-    ->middleware(['auth', 'verified', 'not_blocked'])
+    ->middleware(['auth', 'not_blocked', 'facebook_profile_complete', 'verified'])
     ->name('declarations.commenter');
 
 Route::get('/pieces-jointes/{pieceJointe}/telecharger', [DeclarationController::class, 'telechargerPieceJointe'])
-    ->middleware(['auth', 'verified', 'not_blocked'])
+    ->middleware(['auth', 'not_blocked', 'facebook_profile_complete', 'verified'])
     ->name('pieces-jointes.telecharger');
 
 Route::get('/pieces-jointes/{pieceJointe}/apercu', [DeclarationController::class, 'apercuPieceJointe'])
-    ->middleware(['auth', 'verified', 'not_blocked'])
+    ->middleware(['auth', 'not_blocked', 'facebook_profile_complete', 'verified'])
     ->name('pieces-jointes.apercu');
 
 Route::get('/declarations/{declaration}/photo-privee', [DeclarationController::class, 'afficherPhotoPrivee'])
-    ->middleware(['auth', 'verified', 'not_blocked'])
+    ->middleware(['auth', 'not_blocked', 'facebook_profile_complete', 'verified'])
     ->name('declarations.photo-privee');
 
 Route::get('/declarations/{declaration}/statut-publication', [DeclarationController::class, 'publicationStatus'])
-    ->middleware(['auth', 'verified', 'not_blocked'])
+    ->middleware(['auth', 'not_blocked', 'facebook_profile_complete', 'verified'])
     ->name('declarations.publication-status');
 
-Route::middleware(['auth', 'not_blocked'])->group(function () {
+Route::middleware(['auth', 'not_blocked', 'facebook_profile_complete'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
@@ -58,7 +58,7 @@ Route::middleware(['auth', 'not_blocked'])->group(function () {
 require __DIR__.'/auth.php';
 
 // ---------- Citoyen ----------
-Route::middleware(['auth', 'verified', 'not_blocked', 'role:citoyen'])->group(function () {
+Route::middleware(['auth', 'not_blocked', 'facebook_profile_complete', 'verified', 'role:citoyen'])->group(function () {
     Route::get('/pertes-objets', [RapprochementController::class, 'pertes'])->name('rapprochements.pertes');
     Route::post('/declarations/{declaration}/correspondance', [RapprochementController::class, 'proposer'])
         ->middleware('throttle:6,1')->name('rapprochements.proposer');

@@ -51,6 +51,12 @@ class User extends Authenticatable implements MustVerifyEmailContract
         return $this->role === Role::Citoyen;
     }
 
+    public function needsFacebookProfileCompletion(): bool
+    {
+        return $this->isCitoyen() && filled($this->facebook_id)
+            && (blank($this->telephone) || blank($this->email));
+    }
+
     public function photoUrl(): ?string
     {
         if ($this->photo_path) {

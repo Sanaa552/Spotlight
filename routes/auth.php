@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\ConfirmablePasswordController;
+use App\Http\Controllers\Auth\CompleteFacebookProfileController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\EmailVerificationAddressController;
 use App\Http\Controllers\Auth\EmailVerificationPromptController;
@@ -27,9 +28,6 @@ Route::middleware('guest')->group(function () {
     Route::get('auth/facebook', [FacebookAuthController::class, 'redirect'])
         ->name('facebook.redirect');
 
-    Route::get('auth/facebook/callback', [FacebookAuthController::class, 'callback'])
-        ->name('facebook.callback');
-
     Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
         ->name('password.request');
 
@@ -43,7 +41,15 @@ Route::middleware('guest')->group(function () {
         ->name('password.store');
 });
 
+Route::get('auth/facebook/callback', [FacebookAuthController::class, 'callback'])
+    ->name('facebook.callback');
+
 Route::middleware('auth')->group(function () {
+    Route::get('profil/facebook/completer', [CompleteFacebookProfileController::class, 'edit'])
+        ->name('facebook.profile.edit');
+    Route::patch('profil/facebook/completer', [CompleteFacebookProfileController::class, 'update'])
+        ->name('facebook.profile.update');
+
     Route::get('verify-email', EmailVerificationPromptController::class)
         ->name('verification.notice');
 
@@ -68,4 +74,9 @@ Route::middleware('auth')->group(function () {
 
     Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
         ->name('logout');
+});
+
+Route::middleware(['auth', 'verified', 'not_blocked', 'facebook_profile_complete', 'password.confirm'])->group(function () {
+    Route::get('profil/facebook/lier', [FacebookAuthController::class, 'linkRedirect'])
+        ->name('facebook.link.redirect');
 });

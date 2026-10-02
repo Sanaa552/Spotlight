@@ -6,6 +6,8 @@ use App\Enums\Role;
 use App\Models\User;
 use GuzzleHttp\Client;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
+use App\Notifications\SpotlightVerifyEmail;
 use Laravel\Socialite\Contracts\User as SocialiteUser;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\FacebookProvider;
@@ -16,156 +18,243 @@ class FacebookAuthenticationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_facebook_can_create_a_citizen_account(): void
+    public function test_new_facebook_citizen_completes_phone_before_dashboard(): void
     {
         $this->mockFacebookUser('facebook-1', 'citoyen.facebook@gmail.com');
 
-        $this->get(route('facebook.callback'))
-            ->assertRedirect(route('dashboard', absolute: false));
+        $this->get(route('facebook.callback'))->assertRedirect(route('facebook.profile.edit'));
 
-        $user = User::where('email', 'citoyen.facebook@gmail.com')->firstOrFail();
-
+        $user = User::where('facebook_id', 'facebook-1')->firstOrFail();
         $this->assertTrue($user->isCitoyen());
         $this->assertTrue($user->hasVerifiedEmail());
-        $this->assertAuthenticatedAs($user);
         $this->assertSame('https://example.com/avatar.jpg', $user->facebook_avatar_url);
+        $this->assertAuthenticatedAs($user);
+        $this->get(route('dashboard'))->assertRedirect(route('facebook.profile.edit'));
+        $this->get(route('declarations.create'))->assertRedirect(route('facebook.profile.edit'));
+        $this->get(route('profile.edit'))->assertRedirect(route('facebook.profile.edit'));
+        $this->get(route('facebook.profile.edit'))->assertOk()
+            ->assertSee('Indiquez de préférence votre numéro WhatsApp.')
+            ->assertSee('citoyen.facebook@gmail.com');
+
+        $this->patch(route('facebook.profile.update'), ['telephone' => '+237 690 000 000'])
+            ->assertRedirect(route('dashboard'));
+        $this->assertSame('+237690000000', $user->fresh()->telephone);
         $this->get(route('dashboard'))->assertOk();
-        $this->get(route('profile.edit'))->assertOk()->assertSee('https://example.com/avatar.jpg');
+        $this->get(route('facebook.profile.edit'))->assertRedirect(route('dashboard'));
+    }
+
+    public function test_facebook_without_email_requires_email_then_uses_verification(): void
+    {
+        Notification::fake();
+        $this->mockFacebookUser('facebook-no-email', null);
+
+        $this->get(route('facebook.callback'))->assertRedirect(route('facebook.profile.edit'));
+        $user = User::where('facebook_id', 'facebook-no-email')->firstOrFail();
+        $this->assertNull($user->email);
+        $this->get(route('facebook.profile.edit'))->assertOk()->assertSee('Adresse e-mail');
+
+        $this->patch(route('facebook.profile.update'), [
+            'email' => 'nouveau@example.com',
+            'telephone' => '+237690000000',
+        ])->assertRedirect(route('verification.notice'));
+
+        $this->assertSame('nouveau@example.com', $user->fresh()->email);
+        $this->assertFalse($user->fresh()->hasVerifiedEmail());
+        Notification::assertSentTo($user, SpotlightVerifyEmail::class);
+        $this->get(route('dashboard'))->assertRedirect(route('verification.notice'));
+        $this->get(route('verification.notice'))->assertOk();
+
+        $user->markEmailAsVerified();
+        $this->actingAs($user->fresh())->get(route('dashboard'))->assertOk();
+    }
+
+    public function test_missing_email_cannot_use_an_existing_spotlight_address(): void
+    {
+        $existing = User::factory()->create(['email' => 'existant@example.com']);
+        $this->mockFacebookUser('facebook-no-email', null);
+        $this->get(route('facebook.callback'));
+
+        $this->patch(route('facebook.profile.update'), [
+            'email' => 'existant@example.com',
+            'telephone' => '+237690000000',
+        ])->assertSessionHasErrors('email');
+        $this->assertNull(User::where('facebook_id', 'facebook-no-email')->firstOrFail()->email);
+        $this->assertNull($existing->fresh()->facebook_id);
+    }
+
+    public function test_invalid_phone_is_rejected_without_losing_the_profile(): void
+    {
+        $this->mockFacebookUser('facebook-phone', 'phone@example.com');
+        $this->get(route('facebook.callback'));
+
+        $this->patch(route('facebook.profile.update'), ['telephone' => '690000000'])
+            ->assertSessionHasErrors('telephone');
+        $this->get(route('dashboard'))->assertRedirect(route('facebook.profile.edit'));
+    }
+
+    public function test_existing_linked_citizen_with_complete_profile_enters_normally(): void
+    {
+        $citizen = User::factory()->create([
+            'email' => 'citoyen@gmail.com',
+            'facebook_id' => 'facebook-2',
+            'telephone' => '+237690000000',
+        ]);
+        $this->mockFacebookUser('facebook-2', $citizen->email);
+
+        $this->get(route('facebook.callback'))->assertRedirect(route('dashboard'));
+        $this->assertAuthenticatedAs($citizen);
+        $this->get(route('dashboard'))->assertOk();
+    }
+
+    public function test_an_existing_email_account_is_not_auto_linked(): void
+    {
+        $citizen = User::factory()->create(['email' => 'citoyen@gmail.com']);
+        $this->mockFacebookUser('facebook-unlinked', $citizen->email);
+
+        $this->get(route('facebook.callback'))->assertRedirect(route('login'))
+            ->assertSessionHasErrors('email');
+        $this->assertGuest();
+        $this->assertNull($citizen->fresh()->facebook_id);
+        $this->assertSame(1, User::count());
+    }
+
+    public function test_facebook_cannot_link_to_an_internal_or_blocked_account(): void
+    {
+        foreach ([Role::Moderateur, Role::Administrateur] as $role) {
+            $user = User::factory()->create(['role' => $role]);
+            $this->mockFacebookUser('facebook-'.$user->id, $user->email);
+            $this->get(route('facebook.callback'))->assertRedirect(route('login'))
+                ->assertSessionHasErrors('email');
+            $this->assertGuest();
+            $this->assertNull($user->fresh()->facebook_id);
+        }
+
+        $blocked = User::factory()->create(['facebook_id' => 'facebook-blocked', 'is_blocked' => true]);
+        $this->mockFacebookUser('facebook-blocked', $blocked->email);
+        $this->get(route('facebook.callback'))->assertRedirect(route('login'));
+        $this->assertGuest();
+    }
+
+    public function test_only_facebook_citizens_can_use_completion_page(): void
+    {
+        $ordinary = User::factory()->create(['telephone' => null]);
+        $this->actingAs($ordinary)->get(route('facebook.profile.edit'))->assertForbidden();
+        $this->actingAs($ordinary)->get(route('dashboard'))->assertOk();
+        $moderator = User::factory()->create(['role' => Role::Moderateur]);
+        $this->actingAs($moderator)->get(route('facebook.profile.edit'))->assertForbidden();
+    }
+
+    public function test_incomplete_facebook_citizen_can_log_out(): void
+    {
+        $citizen = User::factory()->create(['facebook_id' => 'facebook-logout', 'telephone' => null]);
+        $this->actingAs($citizen)->post(route('logout'))->assertRedirect('/');
+        $this->assertGuest();
+    }
+
+    public function test_existing_password_account_must_confirm_password_before_facebook_link(): void
+    {
+        $citizen = User::factory()->create();
+        $this->actingAs($citizen)->get(route('facebook.link.redirect'))
+            ->assertRedirect(route('password.confirm'));
+        $this->assertNull($citizen->fresh()->facebook_id);
+    }
+
+    public function test_confirmed_password_account_can_link_facebook_without_changing_its_email(): void
+    {
+        config()->set('services.facebook.client_id', 'test-client-id');
+        config()->set('services.facebook.client_secret', 'test-client-secret');
+        $citizen = User::factory()->create(['email' => 'original@example.com']);
+
+        $response = $this->actingAs($citizen)
+            ->withSession(['auth.password_confirmed_at' => time()])
+            ->get(route('facebook.link.redirect'));
+        $response->assertRedirect();
+        $query = [];
+        parse_str((string) parse_url($response->headers->get('Location'), PHP_URL_QUERY), $query);
+        $this->assertSame(config('services.facebook.redirect'), $query['redirect_uri']);
+        $this->assertNotEmpty($query['state']);
+        $this->assertSame($citizen->id, session('facebook_link_user_id'));
+
+        $this->mockFacebookUser('facebook-linked', 'autre@example.com');
+        $this->get(route('facebook.callback'))->assertRedirect(route('profile.edit'));
+        $this->assertSame('facebook-linked', $citizen->fresh()->facebook_id);
+        $this->assertSame('original@example.com', $citizen->fresh()->email);
+        $this->assertSame(1, User::count());
+    }
+
+    public function test_facebook_link_rejects_an_identity_already_owned_by_another_user(): void
+    {
+        $owner = User::factory()->create(['facebook_id' => 'facebook-owned']);
+        $citizen = User::factory()->create();
+        $this->actingAs($citizen)->withSession(['facebook_link_user_id' => $citizen->id]);
+        $this->mockFacebookUser('facebook-owned', $owner->email);
+
+        $this->get(route('facebook.callback'))->assertRedirect(route('profile.edit'))
+            ->assertSessionHasErrors('facebook');
+        $this->assertNull($citizen->fresh()->facebook_id);
+    }
+
+    public function test_facebook_redirect_uses_only_identity_scopes_and_canonical_callback(): void
+    {
+        config()->set('services.facebook.client_id', 'test-client-id');
+        config()->set('services.facebook.client_secret', 'test-client-secret');
+        $url = config('services.facebook.redirect');
+
+        $response = $this->get(route('facebook.redirect'));
+        $response->assertRedirect();
+        $query = [];
+        parse_str((string) parse_url($response->headers->get('Location'), PHP_URL_QUERY), $query);
+        $this->assertSame($url, $query['redirect_uri']);
+        $this->assertStringNotContainsString('//auth/', $url);
+        $this->assertStringContainsString('/'.config('services.meta.graph_version').'/dialog/oauth', $response->headers->get('Location'));
+        $this->assertSame(['public_profile', 'email'], explode(',', $query['scope']));
+        $this->assertNotEmpty($query['state']);
+        $response->assertSessionHas('state');
+    }
+
+    public function test_callback_without_matching_state_is_rejected(): void
+    {
+        $this->get(route('facebook.callback', ['code' => 'fake-code', 'state' => 'wrong']))
+            ->assertRedirect(route('login'))
+            ->assertSessionHasErrors('email');
+        $this->assertGuest();
     }
 
     public function test_facebook_callback_uses_the_configured_ca_bundle(): void
     {
         config()->set('services.meta.ca_bundle', 'C:/certificates/meta-ca.pem');
         $this->mockFacebookUser('facebook-tls', 'citoyen.tls@gmail.com');
-
-        $this->get(route('facebook.callback'))
-            ->assertRedirect(route('dashboard', absolute: false));
-        $this->assertAuthenticated();
+        $this->get(route('facebook.callback'))->assertRedirect(route('facebook.profile.edit'));
     }
 
-    public function test_facebook_can_connect_an_existing_citizen(): void
+    public function test_a_long_facebook_avatar_url_does_not_block_registration(): void
     {
-        $citizen = User::factory()->create([
-            'email' => 'citoyen@gmail.com',
-            'role' => Role::Citoyen,
-        ]);
-        $this->mockFacebookUser('facebook-2', $citizen->email);
+        $this->mockFacebookUser('facebook-long-avatar', 'avatar@example.com',
+            'https://example.com/'.str_repeat('a', 300));
 
-        $this->get(route('facebook.callback'))
-            ->assertRedirect(route('dashboard', absolute: false));
-
-        $this->assertAuthenticatedAs($citizen);
-        $this->assertSame('facebook-2', $citizen->refresh()->facebook_id);
+        $this->get(route('facebook.callback'))->assertRedirect(route('facebook.profile.edit'));
+        $this->assertGreaterThan(255, strlen(User::where('facebook_id', 'facebook-long-avatar')->firstOrFail()->facebook_avatar_url));
     }
 
-    public function test_facebook_login_verifies_a_previously_created_account_with_the_same_email(): void
-    {
-        $citizen = User::factory()->unverified()->create([
-            'email' => 'citoyen.facebook@gmail.com',
-            'facebook_id' => 'facebook-existing',
-        ]);
-        $this->mockFacebookUser('facebook-existing', $citizen->email);
-
-        $this->get(route('facebook.callback'))
-            ->assertRedirect(route('dashboard', absolute: false));
-        $this->assertTrue($citizen->fresh()->hasVerifiedEmail());
-        $this->get(route('dashboard'))->assertOk();
-    }
-
-    public function test_facebook_login_does_not_verify_a_different_spotlight_email(): void
-    {
-        $citizen = User::factory()->unverified()->create([
-            'email' => 'nouvelle.adresse@gmail.com',
-            'facebook_id' => 'facebook-existing',
-        ]);
-        $this->mockFacebookUser('facebook-existing', 'ancienne.adresse@gmail.com');
-
-        $this->get(route('facebook.callback'))
-            ->assertRedirect(route('dashboard', absolute: false));
-        $this->assertFalse($citizen->fresh()->hasVerifiedEmail());
-        $this->get(route('dashboard'))->assertRedirect(route('verification.notice'));
-    }
-
-    public function test_facebook_cannot_connect_a_moderator(): void
-    {
-        $moderator = User::factory()->create([
-            'email' => 'moderateur@gmail.com',
-            'role' => Role::Moderateur,
-        ]);
-        $this->mockFacebookUser('facebook-3', $moderator->email);
-
-        $this->get(route('facebook.callback'))
-            ->assertRedirect(route('login'))
-            ->assertSessionHasErrors('email');
-
-        $this->assertGuest();
-        $this->assertNull($moderator->refresh()->facebook_id);
-    }
-
-    public function test_facebook_cannot_connect_the_super_administrator(): void
-    {
-        $admin = User::factory()->create([
-            'email' => 'admin@gmail.com',
-            'role' => Role::Administrateur,
-        ]);
-        $this->mockFacebookUser('facebook-4', $admin->email);
-
-        $this->get(route('facebook.callback'))
-            ->assertRedirect(route('login'))
-            ->assertSessionHasErrors('email');
-
-        $this->assertGuest();
-        $this->assertNull($admin->refresh()->facebook_id);
-    }
-
-    public function test_facebook_cannot_replace_an_existing_linked_identity(): void
-    {
-        $citizen = User::factory()->create([
-            'email' => 'citoyen@gmail.com',
-            'facebook_id' => 'facebook-original',
-        ]);
-        $this->mockFacebookUser('facebook-different', $citizen->email);
-
-        $this->get(route('facebook.callback'))
-            ->assertRedirect(route('login'))
-            ->assertSessionHasErrors('email');
-        $this->assertGuest();
-        $this->assertSame('facebook-original', $citizen->refresh()->facebook_id);
-    }
-
-    public function test_blocked_citizen_is_not_linked_or_authenticated(): void
-    {
-        $citizen = User::factory()->create([
-            'email' => 'citoyen@gmail.com',
-            'is_blocked' => true,
-        ]);
-        $this->mockFacebookUser('facebook-blocked', $citizen->email);
-
-        $this->get(route('facebook.callback'))
-            ->assertRedirect(route('login'))
-            ->assertSessionHasErrors('email');
-        $this->assertGuest();
-        $this->assertNull($citizen->refresh()->facebook_id);
-    }
-
-    private function mockFacebookUser(string $id, string $email): void
+    private function mockFacebookUser(string $id, ?string $email, string $avatar = 'https://example.com/avatar.jpg'): void
     {
         $facebookUser = Mockery::mock(SocialiteUser::class);
         $facebookUser->shouldReceive('getId')->andReturn($id);
         $facebookUser->shouldReceive('getEmail')->andReturn($email);
         $facebookUser->shouldReceive('getName')->andReturn('Utilisateur Facebook');
         $facebookUser->shouldReceive('getNickname')->andReturnNull();
-        $facebookUser->shouldReceive('getAvatar')->andReturn('https://example.com/avatar.jpg');
+        $facebookUser->shouldReceive('getAvatar')->andReturn($avatar);
 
         $provider = Mockery::mock(FacebookProvider::class);
+        $provider->shouldReceive('usingGraphVersion')->once()
+            ->with(config('services.meta.graph_version', 'v26.0'))->andReturnSelf();
         $provider->shouldReceive('setHttpClient')->once()
             ->withArgs(fn (Client $client) => $client->getConfig('verify') === (config('services.meta.ca_bundle') ?: true))
             ->andReturnSelf();
+        $provider->shouldReceive('fields')->once()
+            ->with(['id', 'name', 'email', 'picture.type(large)'])->andReturnSelf();
         $provider->shouldReceive('user')->once()->andReturn($facebookUser);
 
-        Socialite::shouldReceive('driver')
-            ->once()
-            ->with('facebook')
-            ->andReturn($provider);
+        Socialite::shouldReceive('driver')->once()->with('facebook')->andReturn($provider);
     }
 }
