@@ -50,19 +50,19 @@
         @else
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 @foreach ($declarations as $declaration)
-                    <a href="{{ route('public.declarations.show', $declaration) }}" class="block bg-white/5 border border-white/10 rounded-lg overflow-hidden hover:border-white/30 transition">
+                    <a href="{{ route('public.declarations.show', $declaration) }}" class="flex h-[26rem] min-w-0 flex-col overflow-hidden rounded-md border border-white/10 bg-white/5 transition hover:border-white/30">
                         @if ($declaration->photoUrl())
                             <img src="{{ $declaration->photoUrl() }}"
                                  alt="{{ $declaration->categorie }}"
-                                 class="w-full h-48 object-cover">
+                                 class="h-48 w-full bg-white/5 object-contain">
                         @else
                             <div class="w-full h-48 bg-white/5 flex items-center justify-center">
                                 <x-icon name="search" class="h-10 w-10 text-argent/30" />
                             </div>
                         @endif
 
-                        <div class="p-4">
-                            <div class="flex items-center gap-2 mb-2">
+                        <div class="flex min-h-0 flex-1 flex-col p-4">
+                            <div class="mb-2 flex h-10 flex-wrap content-start items-start gap-1 overflow-hidden">
                                 <x-status-badge :statut="$declaration->statut" />
                                 @if ($declaration->type === 'perte' && $declaration->aDecouverteDocumentee())
                                     <span class="text-xs font-semibold text-sonar">Dépôt documenté, non restitué</span>
@@ -72,14 +72,17 @@
                                     <span class="text-xs font-semibold text-sonar">{{ $declaration->depotDocumentaire() ? 'Dépôt documenté, restitution en attente' : 'Déposé, restitution en attente' }}</span>
                                 @endif
                                 @if ($declaration->lieu)
-                                    <span class="text-xs text-argent/40"> {{ $declaration->lieu }}</span>
+                                    <span class="max-w-full truncate text-xs text-argent/40">{{ $declaration->lieu }}</span>
                                 @endif
                             </div>
-                            <h3 class="text-argent font-semibold text-sm mb-1">
+                            <h3 class="mb-1 h-10 overflow-hidden break-words text-sm font-semibold leading-5 text-argent line-clamp-2">
                                 {{ $declaration->type_perte ?? $declaration->type_decouverte ?? ucfirst($declaration->categorie) }}
                             </h3>
-                            <p class="text-xs text-argent/50 line-clamp-3">{{ $declaration->description }}</p>
-                            <p class="text-xs text-argent/30 mt-2">{{ $declaration->created_at->diffForHumans() }}</p>
+                            <p class="h-[3.75rem] overflow-hidden break-words text-xs leading-5 text-argent/50 line-clamp-3">{{ $declaration->description }}</p>
+                            <div class="mt-auto flex items-center justify-between gap-2 pt-2 text-xs">
+                                <span class="text-argent/30">{{ $declaration->created_at->diffForHumans() }}</span>
+                                <span class="shrink-0 font-medium text-argent/70">Voir le détail</span>
+                            </div>
                         </div>
                     </a>
                 @endforeach

@@ -40,6 +40,23 @@ class PublicDeclarationAnnouncementTest extends TestCase
         $this->get(route('public.declarations.show', $declaration))->assertOk();
     }
 
+    public function test_public_cards_keep_bounded_previews_while_detail_shows_full_description(): void
+    {
+        $owner = User::factory()->create();
+        $declaration = $this->publishedDeclaration($owner);
+        $description = str_repeat('Description détaillée du sac perdu. ', 25);
+        $declaration->update(['description' => $description]);
+
+        $this->actingAs(User::factory()->create())->get(route('dashboard'))
+            ->assertOk()->assertSee('line-clamp-4')->assertSee('h-56 w-full bg-gray-50 object-contain')
+            ->assertSee('Voir le détail');
+        $this->get(route('public.declarations.index', ['onglet' => 'pertes']))
+            ->assertOk()->assertSee('h-[26rem]')->assertSee('line-clamp-3')
+            ->assertSee('Voir le détail');
+        $this->get(route('public.declarations.show', $declaration))
+            ->assertOk()->assertSee($description);
+    }
+
     public function test_pending_or_private_declarations_have_no_public_detail(): void
     {
         $owner = User::factory()->create();

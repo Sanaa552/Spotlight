@@ -32,7 +32,7 @@
                     Aucune déclaration publiée pour le moment.
                 </div>
             @else
-                <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
+                <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 items-stretch">
                     @foreach ($declarations as $declaration)
                         @php
                             $detailRoute = auth()->user()->isCitoyen() && $declaration->user_id === auth()->id()
@@ -42,7 +42,7 @@
                                     : route('moderation.declarations.show', $declaration));
                         @endphp
                         <article id="declaration-{{ $declaration->id }}" x-data="{ showComments: window.location.hash === '#declaration-{{ $declaration->id }}', replyTo: null, replyName: '' }"
-                                 class="bg-white shadow-sm border border-gray-100 rounded-xl overflow-hidden">
+                                 class="flex h-full min-w-0 flex-col overflow-hidden rounded-md border border-gray-100 bg-white shadow-sm">
 
                             <div class="flex items-center gap-3 px-4 pt-4">
                                 @if ($declaration->citoyen->photoUrl())
@@ -62,27 +62,33 @@
                             </div>
 
                             <div class="px-4 pt-3">
-                                <h3 class="font-semibold text-gray-900">
+                                <h3 class="h-10 overflow-hidden break-words font-semibold leading-5 text-gray-900 line-clamp-2">
                                     {{ $declaration->type_perte ?? $declaration->type_decouverte ?? ucfirst($declaration->categorie) }}
                                 </h3>
-                                <p class="text-sm text-gray-700 mt-1 whitespace-pre-line">{{ $declaration->description }}</p>
-                                @if ($declaration->lieu)
-                                    <p class="text-xs text-gray-400 mt-2 flex items-center gap-1.5">
-                                        <x-icon name="location" class="w-3.5 h-3.5" />
-                                        {{ $declaration->lieu }}
-                                    </p>
-                                @endif
+                                <p class="mt-1 h-20 overflow-hidden break-words whitespace-pre-line text-sm leading-5 text-gray-700 line-clamp-4">{{ $declaration->description }}</p>
+                                <div class="mt-2 h-4">
+                                    @if ($declaration->lieu)
+                                        <p class="flex min-w-0 items-center gap-1.5 text-xs leading-4 text-gray-400">
+                                            <x-icon name="location" class="h-3.5 w-3.5 shrink-0" />
+                                            <span class="truncate">{{ $declaration->lieu }}</span>
+                                        </p>
+                                    @endif
+                                </div>
                             </div>
 
                             @if ($declaration->photoUrl())
                                 <a href="{{ $detailRoute }}" class="mt-3 block overflow-hidden">
                                     <img src="{{ $declaration->photoUrl() }}"
                                          alt="Photo de {{ $declaration->type_perte ?? $declaration->type_decouverte ?? $declaration->categorie }}"
-                                         class="h-56 w-full object-cover">
+                                         class="h-56 w-full bg-gray-50 object-contain">
+                                </a>
+                            @else
+                                <a href="{{ $detailRoute }}" class="mt-3 flex h-56 items-center justify-center bg-gray-50" aria-label="Voir la déclaration {{ $declaration->id }}">
+                                    <x-icon name="search" class="h-10 w-10 text-gray-300" />
                                 </a>
                             @endif
 
-                            <div class="px-4 py-3 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 mt-2">
+                            <div class="mt-auto flex min-h-[72px] flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-4 py-3">
                                 <div class="flex flex-wrap gap-3 text-xs font-medium text-azur">
                                     @if ($declaration->facebook_post_url)
                                         <a href="{{ $declaration->facebook_post_url }}" target="_blank" rel="noopener noreferrer" class="hover:underline">Facebook</a>
