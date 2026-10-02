@@ -12,6 +12,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
@@ -97,6 +98,8 @@ class FacebookAuthController extends Controller
                 'email' => 'Facebook n’a pas fourni votre identifiant. Réessayez.',
             ]);
         }
+
+        $this->diagnoseFacebookEmail($facebookUser);
 
         $email = $facebookUser->getEmail();
         $facebookEmailReceived = is_string($email) && trim($email) !== '';
@@ -264,6 +267,50 @@ class FacebookAuthController extends Controller
 
         return redirect()->route('login')->withErrors([
             'email' => 'Cette adresse e-mail appartient déjà à un compte Spotlight. Pour éviter une association non autorisée, connectez-vous avec son mot de passe. Votre compte existant reste intact.',
+        ]);
+    }
+
+    private function diagnoseFacebookEmail(\Laravel\Socialite\Contracts\User $facebookUser): void
+    {
+        if (! config('services.facebook.email_diagnostic_enabled')) {
+            return;
+        }
+
+        $raw = $facebookUser->getRaw();
+        $rawEmail = $raw['email'] ?? null;
+        $socialiteEmail = $facebookUser->getEmail();
+        $permission = 'unavailable';
+
+        try {
+            $token = $facebookUser->token;
+            if (is_string($token) && $token !== '') {
+                $response = Http::withToken($token)
+                    ->withOptions(['verify' => config('services.meta.ca_bundle') ?: true])
+                    ->connectTimeout(3)
+                    ->timeout(5)
+                    ->get('https://graph.facebook.com/'.config('services.meta.graph_version', 'v26.0').'/me/permissions');
+
+                if ($response->successful() && is_array($response->json('data'))) {
+                    $permission = 'absent';
+                    foreach ($response->json('data') as $entry) {
+                        if (is_array($entry) && ($entry['permission'] ?? null) === 'email') {
+                            $permission = in_array($entry['status'] ?? null, ['granted', 'declined'], true)
+                                ? $entry['status'] : 'unavailable';
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (Throwable) {
+            // This temporary diagnostic must never interrupt Facebook Login.
+        }
+
+        Log::info('Diagnostic email Facebook Spotlight', [
+            'permission_email' => $permission,
+            'graph_email_present' => array_key_exists('email', $raw),
+            'graph_email_nonempty' => is_string($rawEmail) && trim($rawEmail) !== '',
+            'socialite_email_usable' => is_string($socialiteEmail)
+                && (bool) filter_var(trim($socialiteEmail), FILTER_VALIDATE_EMAIL),
         ]);
     }
 

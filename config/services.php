@@ -39,6 +39,7 @@ return [
         'client_id' => env('FACEBOOK_CLIENT_ID'),
         'client_secret' => env('FACEBOOK_CLIENT_SECRET'),
         'redirect' => rtrim((string) env('APP_URL', 'http://localhost'), '/').'/auth/facebook/callback',
+        'email_diagnostic_enabled' => env('FACEBOOK_EMAIL_DIAGNOSTIC_ENABLED', false),
     ],
 
     'meta' => [

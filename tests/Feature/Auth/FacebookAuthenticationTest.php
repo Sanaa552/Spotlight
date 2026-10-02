@@ -6,11 +6,13 @@ use App\Enums\Role;
 use App\Models\User;
 use GuzzleHttp\Client;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use App\Notifications\SpotlightVerifyEmail;
-use Laravel\Socialite\Contracts\User as SocialiteUser;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\FacebookProvider;
+use Laravel\Socialite\Two\User as SocialiteUser;
 use Mockery;
 use Tests\TestCase;
 
@@ -306,6 +308,93 @@ class FacebookAuthenticationTest extends TestCase
         $this->get(route('facebook.callback'))->assertRedirect(route('facebook.profile.edit'));
     }
 
+    public function test_temporary_email_diagnostic_uses_the_callback_user_token_and_logs_only_flags(): void
+    {
+        config()->set('services.facebook.email_diagnostic_enabled', true);
+        Http::fake(['graph.facebook.com/*/me/permissions' => Http::response([
+            'data' => [['permission' => 'email', 'status' => 'granted']],
+        ])]);
+        Log::spy();
+        $this->mockFacebookUser('facebook-diagnostic', 'citoyen@example.com');
+
+        $this->get(route('facebook.callback'))->assertRedirect(route('facebook.profile.edit'));
+
+        Http::assertSentCount(1);
+        Http::assertSent(fn ($request) => $request->hasHeader('Authorization', 'Bearer test-user-token')
+            && $request->url() === 'https://graph.facebook.com/'.config('services.meta.graph_version').'/me/permissions');
+        Log::shouldHaveReceived('info')->with('Diagnostic email Facebook Spotlight', [
+            'permission_email' => 'granted',
+            'graph_email_present' => true,
+            'graph_email_nonempty' => true,
+            'socialite_email_usable' => true,
+        ])->once();
+    }
+
+    public function test_temporary_email_diagnostic_distinguishes_declined_and_missing_graph_email(): void
+    {
+        config()->set('services.facebook.email_diagnostic_enabled', true);
+        Http::fake(['graph.facebook.com/*/me/permissions' => Http::response([
+            'data' => [['permission' => 'email', 'status' => 'declined']],
+        ])]);
+        Log::spy();
+        $this->mockFacebookUser('facebook-diagnostic-declined', null, rawEmailPresent: false);
+
+        $this->get(route('facebook.callback'))->assertRedirect(route('facebook.profile.edit'));
+
+        Log::shouldHaveReceived('info')->with('Diagnostic email Facebook Spotlight', [
+            'permission_email' => 'declined',
+            'graph_email_present' => false,
+            'graph_email_nonempty' => false,
+            'socialite_email_usable' => false,
+        ])->once();
+    }
+
+    public function test_temporary_email_diagnostic_distinguishes_graph_email_from_socialite_email(): void
+    {
+        config()->set('services.facebook.email_diagnostic_enabled', true);
+        Http::fake(['graph.facebook.com/*/me/permissions' => Http::response(['data' => []])]);
+        Log::spy();
+        $this->mockFacebookUser('facebook-diagnostic-raw-only', null, rawEmailOverride: 'citoyen@example.com');
+
+        $this->get(route('facebook.callback'))->assertRedirect(route('facebook.profile.edit'));
+
+        Log::shouldHaveReceived('info')->with('Diagnostic email Facebook Spotlight', [
+            'permission_email' => 'absent',
+            'graph_email_present' => true,
+            'graph_email_nonempty' => true,
+            'socialite_email_usable' => false,
+        ])->once();
+    }
+
+    public function test_temporary_email_diagnostic_does_not_block_login_when_permissions_request_fails(): void
+    {
+        config()->set('services.facebook.email_diagnostic_enabled', true);
+        Http::fake(['graph.facebook.com/*/me/permissions' => Http::response(['error' => 'unavailable'], 503)]);
+        Log::spy();
+        $this->mockFacebookUser('facebook-diagnostic-error', null, rawEmailPresent: false);
+
+        $this->get(route('facebook.callback'))->assertRedirect(route('facebook.profile.edit'));
+
+        Log::shouldHaveReceived('info')->with('Diagnostic email Facebook Spotlight', [
+            'permission_email' => 'unavailable',
+            'graph_email_present' => false,
+            'graph_email_nonempty' => false,
+            'socialite_email_usable' => false,
+        ])->once();
+    }
+
+    public function test_email_diagnostic_is_disabled_by_default(): void
+    {
+        Http::fake();
+        Log::spy();
+        $this->mockFacebookUser('facebook-diagnostic-disabled', null);
+
+        $this->get(route('facebook.callback'))->assertRedirect(route('facebook.profile.edit'));
+
+        Http::assertNothingSent();
+        Log::shouldNotHaveReceived('info', ['Diagnostic email Facebook Spotlight']);
+    }
+
     public function test_a_long_facebook_avatar_url_does_not_block_registration(): void
     {
         $this->mockFacebookUser('facebook-long-avatar', 'avatar@example.com',
@@ -315,11 +404,13 @@ class FacebookAuthenticationTest extends TestCase
         $this->assertGreaterThan(255, strlen(User::where('facebook_id', 'facebook-long-avatar')->firstOrFail()->facebook_avatar_url));
     }
 
-    private function mockFacebookUser(string $id, ?string $email, string $avatar = 'https://example.com/avatar.jpg'): void
+    private function mockFacebookUser(string $id, ?string $email, string $avatar = 'https://example.com/avatar.jpg', bool $rawEmailPresent = true, ?string $rawEmailOverride = null): void
     {
         $facebookUser = Mockery::mock(SocialiteUser::class);
+        $facebookUser->token = 'test-user-token';
         $facebookUser->shouldReceive('getId')->andReturn($id);
         $facebookUser->shouldReceive('getEmail')->andReturn($email);
+        $facebookUser->shouldReceive('getRaw')->andReturn($rawEmailPresent ? ['email' => $rawEmailOverride ?? $email] : []);
         $facebookUser->shouldReceive('getName')->andReturn('Utilisateur Facebook');
         $facebookUser->shouldReceive('getNickname')->andReturnNull();
         $facebookUser->shouldReceive('getAvatar')->andReturn($avatar);
