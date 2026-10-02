@@ -41,13 +41,13 @@
                         <p class="mt-1 text-sm text-gray-600">{{ $match->statut === 'propose' ? 'Proposition en attente de vérification. La découverte ne sera pas publiée avant cette décision.' : ($match->statut === 'verifie' ? 'Correspondance possible vérifiée ; aucune restitution n’est encore confirmée.' : 'Restitution confirmée.') }}</p>
                         @if ($match->statut === 'verifie' && $declaration->statut === 'validee' && $match->perte->statut === 'validee' && auth()->user()->isCitoyen() && $declaration->user_id === auth()->id())
                             @if ($match->decouvreur_confirme_at)
-                                <p class="mt-3 text-sm text-sonar-dark">Vous avez confirmé la remise. La modération attend les autres vérifications.</p>
+                                <p class="mt-3 text-sm text-sonar-dark">Vous avez signalé la remise au propriétaire. La modération attend sa confirmation et contrôlera la restitution.</p>
                             @else
                                 <form method="POST" action="{{ route('rapprochements.confirmer', $match) }}" class="mt-3" x-data="{ confirm: false }">
                                     @csrf
-                                    <button type="button" x-on:click="confirm = true" class="text-sm font-semibold text-sonar-dark underline">Confirmer que l’objet a été remis</button>
+                                    <button type="button" x-on:click="confirm = true" class="text-sm font-semibold text-sonar-dark underline">Signaler la remise au propriétaire</button>
                                     <div x-show="confirm" x-cloak class="mt-2 border-l-2 border-sonar pl-3 text-sm text-gray-700">
-                                        Confirmez uniquement après la remise réelle.
+                                        Utilisez ce bouton uniquement si l’objet a été remis au propriétaire, pas pour signaler son dépôt au poste. Le propriétaire et la modération recevront une notification ; la restitution devra encore être contrôlée.
                                         <button type="submit" class="ml-2 font-semibold text-sonar-dark underline">Oui, confirmer</button>
                                         <button type="button" x-on:click="confirm = false" class="ml-2 text-gray-500 underline">Annuler</button>
                                     </div>

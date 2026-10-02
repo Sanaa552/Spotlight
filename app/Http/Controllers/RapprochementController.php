@@ -187,11 +187,15 @@ class RapprochementController extends Controller
         }
 
         Log::info('Remise confirmee par declarant Spotlight', ['rapprochement_id' => $rapprochement->id, 'user_id' => $request->user()->id]);
-        if ($owner && $updated) {
+        if ($owner) {
             $notifier->remiseDeclareeParProprietaire($rapprochement);
+        } else {
+            $notifier->remiseDeclareeParDecouvreur($rapprochement->fresh(['perte.citoyen', 'decouverte.citoyen']));
         }
 
-        return back()->with('success', 'Votre confirmation a été enregistrée. La modération clôturera les dossiers après contrôle.');
+        return back()->with('success', $owner
+            ? 'Votre confirmation a été enregistrée. La modération clôturera les dossiers après contrôle.'
+            : 'Votre signalement de remise au propriétaire a été enregistré. Le propriétaire et la modération ont été informés ; la restitution reste à vérifier.');
     }
 
     public function finaliser(Request $request, Rapprochement $rapprochement, RapprochementNotifier $notifier): RedirectResponse

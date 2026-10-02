@@ -100,6 +100,41 @@ class RapprochementFlowTest extends TestCase
         $this->get(route('public.declarations.index', ['onglet' => 'restitutions']))->assertSee('Sac rouge');
     }
 
+    public function test_finder_handover_signal_notifies_owner_and_moderation_once_without_closing(): void
+    {
+        Notification::fake();
+        $owner = User::factory()->create();
+        $finder = User::factory()->create();
+        $moderator = User::factory()->create(['role' => 'moderateur']);
+        $admin = User::factory()->create(['role' => 'administrateur']);
+        $loss = $this->loss($owner);
+        $found = $this->found($finder);
+        $match = Rapprochement::create(['perte_id' => $loss->id, 'decouverte_id' => $found->id, 'statut' => 'verifie']);
+
+        $this->actingAs($finder)->get(route('declarations.show', $found))
+            ->assertOk()->assertSee('Signaler la remise au propriétaire')
+            ->assertSee('pas pour signaler son dépôt au poste');
+        $this->post(route('rapprochements.confirmer', $match))->assertSessionHas('success');
+
+        $this->assertNotNull($match->fresh()->decouvreur_confirme_at);
+        $this->assertNull($match->fresh()->proprietaire_confirme_at);
+        $this->assertSame('verifie', $match->fresh()->statut);
+        $this->assertSame('validee', $loss->fresh()->statut);
+        Notification::assertSentTo($owner, RapprochementUpdate::class,
+            fn ($notification) => str_contains($notification->message, 'Cette déclaration n\'est pas une restitution vérifiée')
+                && str_contains($notification->url, '/declarations/'.$loss->id));
+        foreach ([$moderator, $admin] as $recipient) {
+            Notification::assertSentTo($recipient, RapprochementUpdate::class,
+                fn ($notification) => str_contains($notification->message, 'Attendez la confirmation du propriétaire')
+                    && str_contains($notification->url, '/moderation/declarations/'.$found->id));
+        }
+
+        $this->post(route('rapprochements.confirmer', $match))->assertSessionHas('warning');
+        Notification::assertSentToTimes($owner, RapprochementUpdate::class, 1);
+        Notification::assertSentToTimes($moderator, RapprochementUpdate::class, 1);
+        Notification::assertSentToTimes($admin, RapprochementUpdate::class, 1);
+    }
+
     public function test_person_discovery_cannot_be_matched_publicly_and_invalid_loss_is_rejected(): void
     {
         $owner = User::factory()->create();

@@ -90,6 +90,34 @@ class RapprochementNotifier
         );
     }
 
+    public function remiseDeclareeParDecouvreur(Rapprochement $rapprochement): void
+    {
+        $perte = $rapprochement->perte->libelleNotification();
+        $decouverte = $rapprochement->decouverte->libelleNotification();
+
+        if ($rapprochement->perte->user_id !== $rapprochement->decouverte->user_id) {
+            $this->envoyer(
+                collect([$rapprochement->perte->citoyen]),
+                $rapprochement->perte_id,
+                "Le découvreur de {$decouverte} signale une remise de l'objet lié à votre {$perte}. Cette déclaration n'est pas une restitution vérifiée. Confirmez dans votre dossier uniquement si vous avez effectivement récupéré l'objet ; la modération contrôlera ensuite la remise.",
+                "Spotlight : remise signalée pour {$perte}",
+                null,
+                $rapprochement,
+            );
+        }
+
+        $moderateurs = User::query()
+            ->whereIn('role', [Role::Moderateur->value, Role::Administrateur->value])
+            ->where('is_blocked', false)->get();
+        $this->envoyer(
+            $moderateurs,
+            $rapprochement->decouverte_id,
+            "Le découvreur de {$decouverte} signale une remise de l'objet lié à {$perte}. Ce signalement ne prouve pas la restitution. Attendez la confirmation du propriétaire, puis contrôlez la remise avant de clôturer les dossiers.",
+            "Spotlight : remise signalée à contrôler pour {$perte}",
+            route('moderation.declarations.show', $rapprochement->decouverte_id),
+        );
+    }
+
     public function restitution(Rapprochement $rapprochement): void
     {
         $perte = $rapprochement->perte->libelleNotification();

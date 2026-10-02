@@ -6,13 +6,13 @@
   <style>
     @page { size: A4; margin: 18mm 17mm; }
     * { box-sizing: border-box; }
-    body { font-family: Arial, sans-serif; color: #17202b; font-size: 10.5pt; line-height: 1.42; margin: 0; }
+    body { font-family: Arial, sans-serif; color: #17202b; font-size: 10.2pt; line-height: 1.36; margin: 0; }
     h1 { font-size: 21pt; margin: 0 0 3mm; color: #17202b; }
-    h2 { font-size: 13pt; margin: 7mm 0 2mm; color: #a71927; break-after: avoid; }
+    h2 { font-size: 13pt; margin: 6mm 0 2mm; color: #a71927; break-after: avoid; }
     h3 { font-size: 10.5pt; margin: 4mm 0 1mm; }
     p { margin: 0 0 2.5mm; }
     ol, ul { margin: 2mm 0 3mm; padding-left: 6mm; }
-    li { margin: 1.5mm 0; }
+    li { margin: 1.2mm 0; }
     .subtitle { color: #516071; font-size: 11pt; margin-bottom: 7mm; }
     .rule { border-top: 2px solid #cf2636; padding-top: 3mm; }
     .state { background: #f1f5f6; border-left: 3px solid #177c72; padding: 2.5mm 3mm; margin: 3mm 0; }
@@ -59,11 +59,12 @@
 
   <h2>3. Informer sans confondre les étapes</h2>
   <p>Une simple proposition de correspondance n'alerte pas le propriétaire : elle peut être erronée. Après vérification par la modération, le propriétaire et le découvreur reçoivent une notification Spotlight et un email indiquant qu'une correspondance est <strong>possible</strong>, non qu'une remise a eu lieu. Le lien reçu par le propriétaire ouvre <strong>son propre dossier de perte</strong> ; celui du découvreur reste privé tant qu'il n'est pas publié.</p>
-  <p>Une fois la découverte publiée, le propriétaire reçoit le nom du poste et la méthode de contrôle. Si seul le justificatif a été examiné, il doit contacter le poste <strong>avant de se déplacer</strong>, car la présence actuelle de l'objet n'est pas confirmée directement. Son bouton « Confirmer que j'ai récupéré mon objet » apparaît sur son dossier de perte ; il ne doit l'utiliser qu'après la remise réelle. Les coordonnées et les pièces privées de l'autre déclarant ne sont pas partagées.</p>
+  <p>Lorsque le découvreur ajoute son justificatif, la modération reçoit un email et une notification ; le propriétaire n'est pas encore informé du dépôt, qui n'a pas été contrôlé. Une fois la découverte publiée, le propriétaire reçoit le nom du poste et la méthode de contrôle. Si seul le justificatif a été examiné, il doit contacter le poste <strong>avant de se déplacer</strong>, car la présence actuelle de l'objet n'est pas confirmée directement. Son bouton « Confirmer que j'ai récupéré mon objet » apparaît sur son dossier de perte ; il ne doit l'utiliser qu'après la remise réelle. Les coordonnées et les pièces privées de l'autre déclarant ne sont pas partagées.</p>
+  <p class="small">Les notifications Spotlight sont enregistrées dans l'application. Les emails sont traités en file d'attente : le worker doit fonctionner pour les envoyer. Un email en attente ne signifie pas que le dossier a été publié ou restitué.</p>
 
   <h2>4. Confirmer la restitution</h2>
   <ol>
-    <li>Le propriétaire confirme dans Spotlight qu'il a <strong>effectivement récupéré</strong> son objet. La modération reçoit une alerte. Le découvreur peut aussi signaler la remise, mais sa confirmation n'est pas une condition bloquante.</li>
+    <li>Le propriétaire confirme dans Spotlight qu'il a <strong>effectivement récupéré</strong> son objet. La modération reçoit une alerte. Le découvreur peut aussi signaler une remise <strong>au propriétaire</strong>, distincte du dépôt au poste : le propriétaire et la modération sont alors alertés, mais sa déclaration n'est ni une preuve de restitution ni une condition bloquante.</li>
     <li>Le modérateur contrôle la confirmation de remise, consigne une note interne et clôture les dossiers de perte et de découverte. Ce contrôle n'implique pas un déplacement systématique.</li>
     <li>Spotlight lance deux <strong>nouveaux avis de restitution</strong>, un pour Facebook et un pour Instagram. Ce ne sont pas des modifications des annonces initiales. Chaque échec est visible et peut être relancé sans republier le réseau déjà confirmé.</li>
   </ol>

@@ -459,7 +459,7 @@ class DeclarationSubmissionTest extends TestCase
             ->assertOk()
             ->assertSee('value="Poste de test (Douala)"', false)
             ->assertSee("type: 'decouverte'", false)
-            ->assertSee('La remise réelle devra être justifiée et le poste sera vérifié par la modération avant publication.');
+            ->assertSee('Après la remise, ajoutez le justificatif des autorités : il doit permettre d’identifier le poste.');
 
         $this->actingAs($citizen)->get(route('declarations.create'))
             ->assertOk()
