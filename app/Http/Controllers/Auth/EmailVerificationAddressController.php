@@ -41,6 +41,7 @@ class EmailVerificationAddressController extends Controller
 
         $user->forceFill([
             'email' => $validated['email'],
+            'email_source' => User::EMAIL_SOURCE_MANUAL,
             'email_verified_at' => null,
         ])->save();
 

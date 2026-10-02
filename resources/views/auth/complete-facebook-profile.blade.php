@@ -21,21 +21,18 @@
                 <p class="mt-1 text-xs text-gray-600">Un lien de vérification sera envoyé à cette adresse.</p>
                 <x-input-error :messages="$errors->get('email')" class="mt-1" />
             </div>
-        @else
-            <div>
-                <x-input-label for="facebook_email" value="Adresse e-mail" />
-                <x-text-input id="facebook_email" type="email" class="mt-1 block w-full" :value="$user->email" disabled />
-            </div>
         @endif
 
-        <div>
-            <x-input-label for="telephone" value="Numéro de téléphone" required />
-            <x-text-input id="telephone" name="telephone" type="tel" class="mt-1 block w-full"
-                          :value="old('telephone', $user->telephone)" required autocomplete="tel"
-                          placeholder="+237690000000" />
-            <p class="mt-1 text-xs leading-5 text-gray-600">Indiquez de préférence votre numéro WhatsApp. Si vous n’utilisez pas WhatsApp, indiquez un numéro sur lequel nous pouvons vous appeler.</p>
-            <x-input-error :messages="$errors->get('telephone')" class="mt-1" />
-        </div>
+        @if (blank($user->telephone))
+            <div>
+                <x-input-label for="telephone" value="Numéro de téléphone" required />
+                <x-text-input id="telephone" name="telephone" type="tel" class="mt-1 block w-full"
+                              :value="old('telephone', $user->telephone)" required autocomplete="tel"
+                              placeholder="+237690000000" />
+                <p class="mt-1 text-xs leading-5 text-gray-600">Indiquez de préférence votre numéro WhatsApp. Si vous n’utilisez pas WhatsApp, indiquez un numéro sur lequel nous pouvons vous appeler.</p>
+                <x-input-error :messages="$errors->get('telephone')" class="mt-1" />
+            </div>
+        @endif
 
         <x-primary-button class="w-full justify-center">Enregistrer et continuer</x-primary-button>
     </form>

@@ -35,15 +35,20 @@ class CompleteFacebookProfileController extends Controller
             return redirect()->route('dashboard');
         }
 
-        $request->merge([
-            'telephone' => preg_replace('/[\s().-]+/', '', (string) $request->input('telephone')),
-            'email' => Str::lower(trim((string) $request->input('email'))),
-        ]);
+        $phoneMissing = blank($user->telephone);
+        $emailMissing = blank($user->email);
+        if ($phoneMissing) {
+            $request->merge(['telephone' => preg_replace('/[\s().-]+/', '', (string) $request->input('telephone'))]);
+        }
+        if ($emailMissing) {
+            $request->merge(['email' => Str::lower(trim((string) $request->input('email')))]);
+        }
 
-        $rules = [
-            'telephone' => ['required', 'string', 'regex:/^\+[1-9]\d{7,14}$/'],
-        ];
-        if (blank($user->email)) {
+        $rules = [];
+        if ($phoneMissing) {
+            $rules['telephone'] = ['required', 'string', 'regex:/^\+[1-9]\d{7,14}$/'];
+        }
+        if ($emailMissing) {
             $rules['email'] = ['required', 'string', 'email', 'max:255', Rule::unique(User::class)];
         }
 
@@ -51,15 +56,17 @@ class CompleteFacebookProfileController extends Controller
             'telephone.regex' => 'Saisissez un numéro international, par exemple +237690000000.',
         ]);
 
-        $user->telephone = $validated['telephone'];
-        $emailAdded = blank($user->email);
-        if ($emailAdded) {
+        if ($phoneMissing) {
+            $user->telephone = $validated['telephone'];
+        }
+        if ($emailMissing) {
             $user->email = $validated['email'];
+            $user->email_source = User::EMAIL_SOURCE_MANUAL;
             $user->email_verified_at = null;
         }
         $user->save();
 
-        if ($emailAdded) {
+        if ($emailMissing) {
             try {
                 $user->sendEmailVerificationNotification();
             } catch (Throwable $exception) {

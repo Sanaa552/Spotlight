@@ -20,6 +20,7 @@ class FacebookAuthenticationTest extends TestCase
 
     public function test_new_facebook_citizen_completes_phone_before_dashboard(): void
     {
+        Notification::fake();
         $this->mockFacebookUser('facebook-1', 'citoyen.facebook@gmail.com');
 
         $this->get(route('facebook.callback'))->assertRedirect(route('facebook.profile.edit'));
@@ -27,14 +28,17 @@ class FacebookAuthenticationTest extends TestCase
         $user = User::where('facebook_id', 'facebook-1')->firstOrFail();
         $this->assertTrue($user->isCitoyen());
         $this->assertTrue($user->hasVerifiedEmail());
+        $this->assertSame(User::EMAIL_SOURCE_FACEBOOK, $user->email_source);
         $this->assertSame('https://example.com/avatar.jpg', $user->facebook_avatar_url);
+        Notification::assertNotSentTo($user, SpotlightVerifyEmail::class);
         $this->assertAuthenticatedAs($user);
         $this->get(route('dashboard'))->assertRedirect(route('facebook.profile.edit'));
         $this->get(route('declarations.create'))->assertRedirect(route('facebook.profile.edit'));
         $this->get(route('profile.edit'))->assertRedirect(route('facebook.profile.edit'));
         $this->get(route('facebook.profile.edit'))->assertOk()
             ->assertSee('Indiquez de préférence votre numéro WhatsApp.')
-            ->assertSee('citoyen.facebook@gmail.com');
+            ->assertDontSee('name="email"', false)
+            ->assertDontSee('citoyen.facebook@gmail.com');
 
         $this->patch(route('facebook.profile.update'), ['telephone' => '+237 690 000 000'])
             ->assertRedirect(route('dashboard'));
@@ -59,6 +63,7 @@ class FacebookAuthenticationTest extends TestCase
         ])->assertRedirect(route('verification.notice'));
 
         $this->assertSame('nouveau@example.com', $user->fresh()->email);
+        $this->assertSame(User::EMAIL_SOURCE_MANUAL, $user->fresh()->email_source);
         $this->assertFalse($user->fresh()->hasVerifiedEmail());
         Notification::assertSentTo($user, SpotlightVerifyEmail::class);
         $this->get(route('dashboard'))->assertRedirect(route('verification.notice'));
@@ -66,6 +71,80 @@ class FacebookAuthenticationTest extends TestCase
 
         $user->markEmailAsVerified();
         $this->actingAs($user->fresh())->get(route('dashboard'))->assertOk();
+    }
+
+    public function test_existing_phone_is_preserved_when_only_facebook_email_is_missing(): void
+    {
+        Notification::fake();
+        $citizen = User::factory()->create([
+            'facebook_id' => 'facebook-email-later',
+            'email' => null,
+            'email_verified_at' => null,
+            'telephone' => '+237690000000',
+        ]);
+        $this->mockFacebookUser('facebook-email-later', null);
+
+        $this->get(route('facebook.callback'))->assertRedirect(route('facebook.profile.edit'));
+        $this->get(route('facebook.profile.edit'))->assertOk()
+            ->assertSee('name="email"', false)
+            ->assertDontSee('name="telephone"', false);
+        $this->patch(route('facebook.profile.update'), [
+            'email' => 'manuel@example.com',
+            'telephone' => '+237699999999',
+        ])->assertRedirect(route('verification.notice'));
+
+        $this->assertSame('+237690000000', $citizen->fresh()->telephone);
+        $this->assertSame(User::EMAIL_SOURCE_MANUAL, $citizen->fresh()->email_source);
+        Notification::assertSentTo($citizen, SpotlightVerifyEmail::class);
+    }
+
+    public function test_legacy_facebook_account_is_verified_when_facebook_now_provides_its_email(): void
+    {
+        Notification::fake();
+        $citizen = User::factory()->unverified()->create([
+            'facebook_id' => 'facebook-legacy',
+            'email' => 'legacy@example.com',
+            'email_source' => null,
+            'telephone' => null,
+        ]);
+        $this->mockFacebookUser('facebook-legacy', 'legacy@example.com');
+
+        $this->get(route('facebook.callback'))->assertRedirect(route('facebook.profile.edit'));
+        $this->assertTrue($citizen->fresh()->hasVerifiedEmail());
+        $this->assertSame(User::EMAIL_SOURCE_FACEBOOK, $citizen->fresh()->email_source);
+        $this->get(route('facebook.profile.edit'))->assertOk()->assertDontSee('name="email"', false);
+        Notification::assertNotSentTo($citizen, SpotlightVerifyEmail::class);
+    }
+
+    public function test_existing_facebook_account_without_email_stores_it_when_facebook_supplies_it_later(): void
+    {
+        $citizen = User::factory()->unverified()->create([
+            'facebook_id' => 'facebook-later',
+            'email' => null,
+            'telephone' => null,
+        ]);
+        $this->mockFacebookUser('facebook-later', 'later@example.com');
+
+        $this->get(route('facebook.callback'))->assertRedirect(route('facebook.profile.edit'));
+        $this->assertSame('later@example.com', $citizen->fresh()->email);
+        $this->assertTrue($citizen->fresh()->hasVerifiedEmail());
+        $this->assertSame(User::EMAIL_SOURCE_FACEBOOK, $citizen->fresh()->email_source);
+    }
+
+    public function test_manually_entered_email_is_not_verified_by_a_later_facebook_login(): void
+    {
+        $citizen = User::factory()->unverified()->create([
+            'facebook_id' => 'facebook-manual',
+            'email' => 'manual@example.com',
+            'email_source' => User::EMAIL_SOURCE_MANUAL,
+            'telephone' => '+237690000000',
+        ]);
+        $this->mockFacebookUser('facebook-manual', 'manual@example.com');
+
+        $this->get(route('facebook.callback'))->assertRedirect(route('dashboard'));
+        $this->assertFalse($citizen->fresh()->hasVerifiedEmail());
+        $this->assertSame(User::EMAIL_SOURCE_MANUAL, $citizen->fresh()->email_source);
+        $this->get(route('dashboard'))->assertRedirect(route('verification.notice'));
     }
 
     public function test_missing_email_cannot_use_an_existing_spotlight_address(): void

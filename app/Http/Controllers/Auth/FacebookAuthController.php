@@ -99,6 +99,7 @@ class FacebookAuthController extends Controller
         }
 
         $email = $facebookUser->getEmail();
+        $facebookEmailReceived = is_string($email) && trim($email) !== '';
         $email = is_string($email) ? Str::lower(trim($email)) : null;
         $email = filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : null;
 
@@ -118,8 +119,13 @@ class FacebookAuthController extends Controller
                     }
                     $user->email = $email;
                     $user->email_verified_at = now();
-                } elseif ($email && Str::lower((string) $user->email) === $email && ! $user->hasVerifiedEmail()) {
-                    $user->email_verified_at = now();
+                    $user->email_source = User::EMAIL_SOURCE_FACEBOOK;
+                } elseif ($email && Str::lower((string) $user->email) === $email
+                    && $user->email_source !== User::EMAIL_SOURCE_MANUAL) {
+                    $user->email_source = User::EMAIL_SOURCE_FACEBOOK;
+                    if (! $user->hasVerifiedEmail()) {
+                        $user->email_verified_at = now();
+                    }
                 }
 
                 $user->facebook_avatar_url = $facebookUser->getAvatar();
@@ -132,6 +138,7 @@ class FacebookAuthController extends Controller
                 $user = User::create([
                     'name' => $facebookUser->getName() ?: $facebookUser->getNickname() ?: 'Utilisateur Facebook',
                     'email' => $email,
+                    'email_source' => $email ? User::EMAIL_SOURCE_FACEBOOK : null,
                     'facebook_id' => $facebookId,
                     'facebook_avatar_url' => $facebookUser->getAvatar(),
                     'password' => Hash::make(Str::random(32)),
@@ -155,7 +162,12 @@ class FacebookAuthController extends Controller
         Auth::login($user, true);
         $request->session()->regenerate();
 
-        Log::info('Connexion Facebook reussie Spotlight', ['user_id' => $user->id]);
+        Log::info('Connexion Facebook reussie Spotlight', [
+            'user_id' => $user->id,
+            'facebook_email_received' => $facebookEmailReceived,
+            'facebook_email_usable' => filled($email),
+            'email_stored' => filled($user->email),
+        ]);
 
         return $user->needsFacebookProfileCompletion()
             ? redirect()->route('facebook.profile.edit')

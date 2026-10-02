@@ -40,6 +40,7 @@ class ProfileTest extends TestCase
 
         $this->assertSame('Test User', $user->name);
         $this->assertSame('test@example.com', $user->email);
+        $this->assertSame(User::EMAIL_SOURCE_MANUAL, $user->email_source);
         $this->assertNull($user->email_verified_at);
     }
 
@@ -74,6 +75,26 @@ class ProfileTest extends TestCase
 
         $this->assertSame('+237 690 000 000', $user->refresh()->telephone);
         $this->assertFalse($user->new_declaration_email);
+    }
+
+    public function test_changing_facebook_email_in_profile_requires_verification_again(): void
+    {
+        $user = User::factory()->create([
+            'facebook_id' => 'facebook-profile-email',
+            'email_source' => User::EMAIL_SOURCE_FACEBOOK,
+            'telephone' => '+237690000000',
+        ]);
+
+        $this->actingAs($user)->patch('/profile', [
+            'name' => $user->name,
+            'email' => 'manuelle@example.com',
+            'telephone' => $user->telephone,
+        ])->assertRedirect('/profile');
+
+        $this->assertSame(User::EMAIL_SOURCE_MANUAL, $user->fresh()->email_source);
+        $this->assertFalse($user->fresh()->hasVerifiedEmail());
+        $this->actingAs($user->fresh())->get(route('dashboard'))
+            ->assertRedirect(route('verification.notice'));
     }
 
     public function test_user_can_delete_their_account(): void

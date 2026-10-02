@@ -46,6 +46,7 @@ class EmailVerificationTest extends TestCase
         $this->assertDatabaseHas('users', [
             'id' => $user->id,
             'email' => 'correcte@example.com',
+            'email_source' => User::EMAIL_SOURCE_MANUAL,
             'email_verified_at' => null,
         ]);
         Notification::assertSentTo($user, SpotlightVerifyEmail::class);

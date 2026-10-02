@@ -35,6 +35,7 @@ class RegistrationTest extends TestCase
 
         $user = User::where('email', 'test@example.com')->firstOrFail();
         $this->assertFalse($user->hasVerifiedEmail());
+        $this->assertSame(User::EMAIL_SOURCE_MANUAL, $user->email_source);
         Notification::assertSentTo($user, SpotlightVerifyEmail::class);
     }
 

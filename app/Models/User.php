@@ -15,9 +15,14 @@ class User extends Authenticatable implements MustVerifyEmailContract
 {
     use HasFactory, Notifiable;
 
+    public const EMAIL_SOURCE_FACEBOOK = 'facebook';
+
+    public const EMAIL_SOURCE_MANUAL = 'manual';
+
     protected $fillable = [
         'name',
         'email',
+        'email_source',
         'telephone',
         'photo_path',
         'facebook_id',
